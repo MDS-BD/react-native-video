@@ -41,3 +41,27 @@ To change the language of the IMA SDK, pass the `adLanguage` prop to the `Video`
 adLanguage="fr"
 ...
 ```
+
+### loadVideoTimeout
+
+Timeout (in seconds) when loading a video ad media file. If loading takes longer than this timeout, the ad playback is canceled and the next ad in the pod plays, if available. Use -1 for the default of 8 seconds.
+
+#### Example:
+
+```jsx
+...
+loadVideoTimeout=5
+...
+```
+
+### vastLoadTimeout
+
+Specifies the VAST load timeout in milliseconds for the initial request and any subsequent wrappers. This parameter is optional and will override the default timeout.
+
+#### Example:
+
+```jsx
+...
+vastLoadTimeout=5000
+...
+```
