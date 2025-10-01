@@ -1,24 +1,23 @@
+import type {ElementRef} from 'react';
 import React, {
-  useState,
+  forwardRef,
   useCallback,
+  useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
-  forwardRef,
-  useImperativeHandle,
+  useState,
 } from 'react';
-import type {ElementRef} from 'react';
-import {View, StyleSheet, Image, Platform, processColor} from 'react-native';
 import type {
-  StyleProp,
+  ImageResizeMode,
   ImageStyle,
   NativeSyntheticEvent,
+  StyleProp,
   ViewStyle,
-  ImageResizeMode,
 } from 'react-native';
+import {Image, Platform, processColor, StyleSheet, View} from 'react-native';
 
-import NativeVideoComponent, {
-  NativeCmcdConfiguration,
-} from './specs/VideoNativeComponent';
+import NativeVideoManager from './specs/NativeVideoManager';
 import type {
   OnAudioFocusChangedData,
   OnAudioTracksData,
@@ -39,21 +38,23 @@ import type {
   OnVideoTracksData,
   VideoSrc,
 } from './specs/VideoNativeComponent';
+import NativeVideoComponent, {
+  NativeCmcdConfiguration,
+} from './specs/VideoNativeComponent';
+import type {
+  CmcdData,
+  OnLoadData,
+  OnReceiveAdEventData,
+  OnTextTracksData,
+  ReactVideoProps,
+  ReactVideoSource,
+} from './types';
+import {CmcdMode, VideoRef, ViewType} from './types';
 import {
   generateHeaderForNative,
   getReactTag,
   resolveAssetSourceForVideo,
 } from './utils';
-import NativeVideoManager from './specs/NativeVideoManager';
-import {ViewType, CmcdMode, VideoRef} from './types';
-import type {
-  OnLoadData,
-  OnTextTracksData,
-  OnReceiveAdEventData,
-  ReactVideoProps,
-  CmcdData,
-  ReactVideoSource,
-} from './types';
 
 const Video = forwardRef<VideoRef, ReactVideoProps>(
   (
@@ -825,6 +826,20 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       }),
       [],
     );
+
+    useEffect(() => {
+      let reactTag: number;
+
+      if (nativeRef.current) {
+        reactTag = getReactTag(nativeRef);
+      }
+
+      return () => {
+        if (reactTag) {
+          NativeVideoManager.stop(reactTag);
+        }
+      };
+    }, []);
 
     return (
       <View style={style}>

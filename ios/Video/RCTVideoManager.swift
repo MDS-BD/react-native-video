@@ -107,6 +107,14 @@ class RCTVideoManager: RCTViewManager {
         })
     }
 
+    @objc(stop:)
+    func stop(_ reactTag: NSNumber) {
+        performOnVideoView(withReactTag: reactTag, callback: { videoView in
+            videoView?.stop()
+        })
+    }
+
+
     override class func requiresMainQueueSetup() -> Bool {
         return true
     }
