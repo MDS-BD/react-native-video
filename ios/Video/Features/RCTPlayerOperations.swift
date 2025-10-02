@@ -104,7 +104,8 @@ enum RCTPlayerOperations {
                 } else {
                     optionValue = currentOption.commonMetadata.map(\.value)[0] as? String
                 }
-                if value == optionValue {
+                
+                if RCTVideoAssetsUtils.normalizeLanguage(value) == RCTVideoAssetsUtils.normalizeLanguage(optionValue) {
                     mediaOption = currentOption
                     break
                 }

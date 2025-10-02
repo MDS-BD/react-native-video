@@ -34,6 +34,15 @@ enum RCTVideoAssetsUtils {
             #endif
         }
     }
+    
+    static func normalizeLanguage(_ code: String?) -> String? {
+        guard let code = code else { return nil }
+        let lower = code.lowercased()
+        if let lang = Locale(identifier: lower).languageCode {
+            return lang
+        }
+        return lower
+    }
 }
 
 // MARK: - RCTVideoUtils
