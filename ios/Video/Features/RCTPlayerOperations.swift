@@ -95,16 +95,19 @@ enum RCTPlayerOperations {
         if type == "disabled" {
             // Do nothing. We want to ensure option is nil
         } else if (type == "language") || (type == "title") {
-            let value = criteria?.value as? String
+            let value = RCTVideoAssetsUtils.getLocale(criteria?.value as? String)
+            
             for i in 0 ..< group.options.count {
                 let currentOption: AVMediaSelectionOption! = group.options[i]
-                var optionValue: String!
+                var optionValue: Locale!
                 if type == "language" {
-                    optionValue = currentOption.extendedLanguageTag
+                    optionValue = currentOption.locale
                 } else {
-                    optionValue = currentOption.commonMetadata.map(\.value)[0] as? String
+                    let lang = currentOption.commonMetadata.map(\.value)[0] as? String
+                    optionValue = RCTVideoAssetsUtils.getLocale(lang)
                 }
-                if value == optionValue {
+                
+                if RCTVideoAssetsUtils.isSameLanguage(value,optionValue) {
                     mediaOption = currentOption
                     break
                 }
