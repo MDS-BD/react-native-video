@@ -114,7 +114,6 @@ class RCTVideoManager: RCTViewManager {
         })
     }
 
-
     override class func requiresMainQueueSetup() -> Bool {
         return true
     }
