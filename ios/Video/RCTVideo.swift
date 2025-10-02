@@ -291,7 +291,6 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
 
         AudioSessionManager.shared.unregisterView(view: self)
 
-        NotificationCenter.default.removeObserver(self)
         self.removePlayerLayer()
         _playerObserver.clearPlayer()
 
@@ -308,7 +307,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     }
 
     deinit {
-        self.stop()
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - App lifecycle handlers
