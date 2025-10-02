@@ -35,13 +35,23 @@ enum RCTVideoAssetsUtils {
         }
     }
     
-    static func normalizeLanguage(_ code: String?) -> String? {
+    static func getLocale(_ code: String?) -> Locale? {
         guard let code = code else { return nil }
         let lower = code.lowercased()
-        if let lang = Locale(identifier: lower).languageCode {
-            return lang
+        
+        return Locale(identifier: lower)
+    }
+    
+    static func isSameLanguage(_ lhs: Locale?, _ rhs: Locale?) -> Bool {
+        guard let lhs = lhs, let rhs = rhs else {
+            return false
         }
-        return lower
+        
+        if #available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *) {
+            return lhs.language.languageCode == rhs.language.languageCode
+        } else {
+            return lhs.languageCode == rhs.languageCode
+        }
     }
 }
 
