@@ -1,7 +1,7 @@
 import {NativeModules} from 'react-native';
 import type {
-  Int32,
   Float,
+  Int32,
   UnsafeObject,
 } from 'react-native/Libraries/Types/CodegenTypes';
 import type {VideoSaveData} from '../types/video-ref';
@@ -27,6 +27,7 @@ export interface VideoManagerType {
   exitPictureInPictureCmd: (reactTag: number) => Promise<void>;
   save: (reactTag: Int32, option: UnsafeObject) => Promise<VideoSaveData>;
   getCurrentPosition: (reactTag: Int32) => Promise<Int32>;
+  stop: (reactTag: Int32) => Promise<void>;
 }
 
 export default NativeModules.VideoManager as VideoManagerType;

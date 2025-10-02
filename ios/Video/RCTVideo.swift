@@ -283,11 +283,12 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         #endif
     }
 
-    deinit {
+    func stop() {
         #if USE_GOOGLE_IMA
-            _imaAdsManager.releaseAds()
+            _imaAdsManager?.releaseAds()
             _imaAdsManager = nil
         #endif
+
         AudioSessionManager.shared.unregisterView(view: self)
 
         NotificationCenter.default.removeObserver(self)
@@ -304,6 +305,10 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
 
         ReactNativeVideoManager.shared.unregisterView(newInstance: self)
         AudioSessionManager.shared.unregisterView(view: self)
+    }
+
+    deinit {
+        self.stop()
     }
 
     // MARK: - App lifecycle handlers
