@@ -154,6 +154,11 @@
 
         func getAd(ad: IMAAd?) -> [String: Any]? {
             guard let _ad = ad else { return nil }
+            
+            var universalAdIDs: [[String: String]] = []
+            for adId in _ad.universalAdIDs {
+                universalAdIDs.append(["adIDValue": adId.adIDValue, "adIDRegistry": adId.adIDRegistry])
+            }
 
             var adInfo: [String: Any] = [
                 "adDescription": _ad.adDescription,
@@ -173,6 +178,7 @@
                 "skipTimeOffset": _ad.skipTimeOffset,
                 "surveyURL": _ad.surveyURL as Any,
                 "traffickingParameters": _ad.traffickingParameters,
+                "universalAdIDs": universalAdIDs,
                 "vastMediaBitrate": _ad.vastMediaBitrate,
                 "vastMediaHeight": _ad.vastMediaHeight,
                 "vastMediaWidth": _ad.vastMediaWidth,
