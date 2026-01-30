@@ -5,6 +5,7 @@
     class RCTIMAAdsManager: NSObject, IMAAdsLoaderDelegate, IMAAdsManagerDelegate, IMALinkOpenerDelegate {
         private weak var _video: RCTVideo?
         private var _isPictureInPictureActive: () -> Bool
+        private var _isPrerollComplete: Bool = false
 
         /* Entry point for the SDK. Used to make ad requests. */
         private var adsLoader: IMAAdsLoader!
@@ -30,6 +31,8 @@
 
         func requestAds() {
             guard let _video else { return }
+            _isPrerollComplete = false
+            DebugLog("[MDS] - REQUEST ADS")
             // fixes RCTVideo --> RCTIMAAdsManager --> IMAAdsLoader --> IMAAdDisplayContainer --> RCTVideo memory leak.
             let adContainerView = UIView(frame: _video.bounds)
             adContainerView.backgroundColor = .clear
@@ -65,6 +68,7 @@
             adsManager.volume = 0
             adsManager.pause()
             adsManager.destroy()
+            _isPrerollComplete = false
         }
 
         // MARK: - Getters
@@ -76,10 +80,15 @@
         func getAdsManager() -> IMAAdsManager? {
             return adsManager
         }
+        
+        func isPrerollComplete() -> Bool {
+            return _isPrerollComplete
+        }
 
         // MARK: - IMAAdsLoaderDelegate
 
         func adsLoader(_: IMAAdsLoader, adsLoadedWith adsLoadedData: IMAAdsLoadedData) {
+            DebugLog("[MDS] - ADS LOADED")
             guard let _video else { return }
             // Grab the instance of the IMAAdsManager and set yourself as the delegate.
             adsManager = adsLoadedData.adsManager
@@ -102,12 +111,14 @@
         }
 
         func adsLoader(_: IMAAdsLoader, failedWith adErrorData: IMAAdLoadingErrorData) {
+            _isPrerollComplete = true
             if adErrorData.adError.message != nil {
                 print("Error loading ads: " + adErrorData.adError.message!)
             }
 
             guard let _video else { return }
-            _video.setPaused(false)
+            DebugLog("[MDS] - IMAAdsLoader FAILED")
+            _video.tryToPauseFromAdv(false)
             if _video.onReceiveAdEvent != nil {
                 _video.onReceiveAdEvent?([
                     "event": "ERROR",
@@ -232,8 +243,9 @@
                 ])
             }
 
+            DebugLog("[MDS] - IMAAdsLoader IMAAdError")
             // Fall back to playing content
-            _video.setPaused(false)
+            _video.tryToPauseFromAdv(false)
         }
 
         func adsManagerAdPlaybackReady(_: IMAAdsManager) {
@@ -261,7 +273,8 @@
         func adsManagerDidRequestContentPause(_: IMAAdsManager) {
             guard let _video else { return }
             // Pause the content for the SDK to play ads.
-            _video.setPaused(true)
+            DebugLog("[MDS] - IMAAdsLoader DidRequestContentPause")
+            _video.tryToPauseFromAdv(true)
             _video.setAdPlaying(true)
             if _video.onReceiveAdEvent != nil {
                 _video.onReceiveAdEvent?([
@@ -273,8 +286,10 @@
         func adsManagerDidRequestContentResume(_: IMAAdsManager) {
             guard let _video else { return }
             // Resume the content since the SDK is done playing ads (at least for now).
+            _isPrerollComplete = true
             _video.setAdPlaying(false)
-            _video.setPaused(false)
+            DebugLog("[MDS] - IMAAdsLoader DidRequestContentResume")
+            _video.tryToPauseFromAdv(false)
             if _video.onReceiveAdEvent != nil {
                 _video.onReceiveAdEvent?([
                     "event": "CONTENT_RESUME_REQUESTED",
@@ -346,3 +361,4 @@
         }
     }
 #endif
+

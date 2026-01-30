@@ -445,10 +445,10 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
 
         if currentTimeSecs >= 0 {
             #if USE_GOOGLE_IMA
-                if !_didRequestAds && currentTimeSecs >= 0.0001 && _source?.adParams.adTagUrl != nil {
+                /*if !_didRequestAds && currentTimeSecs >= 0.0001 && _source?.adParams.adTagUrl != nil {
                     _imaAdsManager.requestAds()
                     _didRequestAds = true
-                }
+                }*/
             #endif
             onVideoProgress?([
                 "currentTime": currentTimeSecs,
@@ -462,10 +462,12 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     }
 
     var isSetSourceOngoing = false
+    var isPreparePlayerComplete = false
     var nextSource: NSDictionary?
 
     func applyNextSource() {
         if self.nextSource != nil {
+            DebugLog("[MDS] - APPLY NEXT SOURCE")
             DebugLog("apply next source")
             self.isSetSourceOngoing = false
             let nextSrc = self.nextSource
@@ -478,6 +480,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
 
     func preparePlayerItem() async throws -> AVPlayerItem {
         guard let source = _source else {
+            DebugLog("[MDS] - PREPARE PLAYER ITEM")
             DebugLog("The source not exist")
             isSetSourceOngoing = false
             applyNextSource()
@@ -573,6 +576,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         }
 
         if _player == nil {
+            DebugLog("[MDS] - SETUP PLAYER IS NIL")
             _player = AVPlayer()
             ReactNativeVideoManager.shared.onInstanceCreated(id: instanceId, player: _player as Any)
 
@@ -591,6 +595,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                 NowPlayingInfoCenterManager.shared.registerPlayer(player: _player!)
             }
         } else {
+            DebugLog("[MDS] - SETUP PLAYER EXIST")
             #if !os(tvOS) && !os(visionOS)
                 if #available(iOS 16.0, macCatalyst 18.0, *) {
                     // This feature caused crashes, if the app was put in bg, before the source change
@@ -615,6 +620,19 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             // later we can just call "updateNowPlayingInfo:
             NowPlayingInfoCenterManager.shared.updateNowPlayingInfo()
         }
+        
+        #if USE_GOOGLE_IMA
+            if _source?.adParams.adTagUrl != nil {
+                // Set up your content playhead and contentComplete callback.
+                _contentPlayhead = IMAAVPlayerContentPlayhead(avPlayer: _player!)
+                DebugLog("[MDS] - SETTT CONTENT PLAYHEAD")
+                if !_didRequestAds && _source?.adParams.adTagUrl != nil {
+                    _imaAdsManager.requestAds()
+                    _didRequestAds = true
+                }
+                //_imaAdsManager.setUpAdsLoader()
+            }
+        #endif
 
         _playerObserver.player = _player
         applyModifiers()
@@ -624,20 +642,14 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             setAutomaticallyWaitsToMinimizeStalling(_automaticallyWaitsToMinimizeStalling)
         }
 
-        #if USE_GOOGLE_IMA
-            if _source?.adParams.adTagUrl != nil {
-                // Set up your content playhead and contentComplete callback.
-                _contentPlayhead = IMAAVPlayerContentPlayhead(avPlayer: _player!)
-
-                _imaAdsManager.setUpAdsLoader()
-            }
-        #endif
+        
         isSetSourceOngoing = false
         applyNextSource()
     }
 
     @objc
     func setSrc(_ source: NSDictionary!) {
+        DebugLog("[MDS] - SETTT SOURCE")
         if self.isSetSourceOngoing || self.nextSource != nil {
             DebugLog("setSrc buffer request")
             self._player?.replaceCurrentItem(with: nil)
@@ -645,9 +657,16 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             return
         }
         self.isSetSourceOngoing = true
+        self.isPreparePlayerComplete = false
 
         let initializeSource = {
             self._source = VideoSource(source)
+            #if USE_GOOGLE_IMA
+            if self._source?.adParams.adTagUrl != nil {
+                DebugLog("[MDS] - SETTT ADS LOADER")
+                self._imaAdsManager.setUpAdsLoader()
+            }
+            #endif
             if self._source?.uri == nil || self._source?.uri == "" {
                 self._player?.replaceCurrentItem(with: nil)
                 self.isSetSourceOngoing = false
@@ -760,6 +779,28 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
 
         return playerItem
     }
+    
+    /**
+     *  VERIFICA SE PUÒ PLAYARE CON ADV
+     */
+    func tryToPauseFromAdv(_ paused: Bool){
+        _playerLayer?.isHidden = paused
+        if self.isPreparePlayerComplete {
+            self.setPaused(paused)
+        }
+    }
+    
+    func tryToPlay(){
+        // PLAYER CARICATO
+        // PREROLL ESEGUITI
+        #if USE_GOOGLE_IMA
+        if _imaAdsManager.isPrerollComplete(), self.isPreparePlayerComplete {
+            _player?.play()
+        }
+        #else
+            _player?.play()
+        #endif
+    }
 
     // MARK: - Prop setters
 
@@ -851,6 +892,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
 
     @objc
     func setPaused(_ paused: Bool) {
+        DebugLog("[MDS] - PLAY: \(!paused) IS PLAYING ADS: \(_adPlaying)")
         if paused {
             if _adPlaying {
                 #if USE_GOOGLE_IMA
@@ -869,7 +911,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                 if #available(iOS 10.0, *), !_automaticallyWaitsToMinimizeStalling {
                     _player?.playImmediately(atRate: _rate)
                 } else {
-                    _player?.play()
+                    tryToPlay()
                     _player?.rate = _rate
                 }
                 _player?.rate = _rate
@@ -1023,7 +1065,8 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         setResizeMode(_resizeMode)
         setRepeat(_repeat)
         setControls(_controls)
-        setPaused(_paused)
+        DebugLog("[MDS] - APPLY MODYFIERS \(_paused)")
+        //setPaused(_paused)
         setAllowsExternalPlayback(_allowsExternalPlayback)
 
         AudioSessionManager.shared.playerPropertiesChanged(view: self)
@@ -1611,9 +1654,13 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                                    "target": self.reactTag as Any])
             }
 
+            DebugLog("[MDS] - READY TO PLAY COMPLETE - isPrepareComplete: \(isPreparePlayerComplete)")
             self._videoLoadStarted = false
             self._playerObserver.attachPlayerEventListeners()
-            self.applyModifiers()
+            //if _imaAdsManager.isPrerollComplete() {
+                self.applyModifiers()
+            //}
+            self.isPreparePlayerComplete = true
         }
     }
 
@@ -1664,6 +1711,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         guard _isPlaying != isPlaying else { return }
         _isPlaying = isPlaying
         if _controls {
+            DebugLog("[MDS] - handleTimeControlStatusChange: \(isPlaying)")
             _paused = !isPlaying
         }
         onVideoPlaybackStateChanged?(["isPlaying": isPlaying, "isSeeking": self._pendingSeek == true, "target": reactTag as Any])
@@ -1874,3 +1922,4 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     @objc
     func setOnClick(_: Any) {}
 }
+
