@@ -2,8 +2,74 @@
     import Foundation
     import GoogleInteractiveMediaAds
 
+    final class CustomContentPlayhead: NSObject, IMAContentPlayhead {
+
+        private weak var _video: RCTVideo?
+        private var timeObserver: Any?
+
+        // MARK: - Init
+
+        init(video: RCTVideo) {
+            self._video = video
+            super.init()
+            startObserving()
+        }
+
+        deinit {
+            release()
+        }
+
+        // MARK: - IMAContentPlayhead
+
+        /// Tempo corrente del contenuto (in secondi)
+        var currentTime: TimeInterval {
+            guard
+                let player = _video
+            else {
+                return 0
+            }
+
+            return player.trackingTime
+        }
+
+        // MARK: - Private
+
+        private func startObserving() {
+            guard let player = _video?._player else { return }
+            
+            timeObserver = player.addPeriodicTimeObserver(
+                forInterval: CMTime(seconds: 0.25, preferredTimescale: Int32(NSEC_PER_SEC)),
+                queue: .main
+            ) { [weak self] time in
+                guard let _ = self else { return }
+
+                // 🔍 LOG DI DEBUG
+                DebugLog("[TVOS] - CustomContentPlayhead: time = \(time.seconds)")
+            }
+        }
+
+        private func stopObserving() {
+            guard
+                let observer = timeObserver,
+                let player = _video?._player
+            else { return }
+
+            player.removeTimeObserver(observer)
+            timeObserver = nil
+        }
+        
+        func release(){
+            self.stopObserving()
+            self._video = nil
+            self.timeObserver = nil
+            DebugLog("[TVOS] - CustomContentPlayhead: RELEASE")
+        }
+    }
+
+
     class RCTIMAAdsManager: NSObject, IMAAdsLoaderDelegate, IMAAdsManagerDelegate, IMALinkOpenerDelegate {
         private weak var _video: RCTVideo?
+        private var _contentPlayhead: CustomContentPlayhead?
         private var _isPictureInPictureActive: () -> Bool
         private var _isInitilizationComplete: Bool = false
 
@@ -42,14 +108,15 @@
             let adDisplayContainer = IMAAdDisplayContainer(adContainer: adContainerView, viewController: _video.reactViewController())
 
             let adTagUrl = _video.getAdTagUrl()
-            let contentPlayhead = _video.getContentPlayhead()
+            //let contentPlayhead = _video.getContentPlayhead()
+            _contentPlayhead = CustomContentPlayhead(video: _video)
 
-            if adTagUrl != nil && contentPlayhead != nil {
+            if adTagUrl != nil {
                 // Create an ad request with our ad tag, display container, and optional user context.
                 let request = IMAAdsRequest(
                     adTagUrl: adTagUrl!,
                     adDisplayContainer: adDisplayContainer,
-                    contentPlayhead: contentPlayhead,
+                    contentPlayhead: _contentPlayhead,
                     userContext: nil,
                 )
                 if let _vastLoadTimeout = _video.getVastLoadTimeout() {
@@ -69,6 +136,9 @@
             adsManager.pause()
             adsManager.destroy()
             _isInitilizationComplete = false
+            
+            guard let _contentPlayhead else { return }
+            _contentPlayhead.release()
         }
 
         // MARK: - Getters
@@ -361,6 +431,5 @@
         }
     }
 #endif
-
 
 

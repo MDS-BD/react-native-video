@@ -95,6 +95,27 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         private var _imaAdsManager: RCTIMAAdsManager!
         /* Playhead used by the SDK to track content video progress and insert mid-rolls. */
         private var _contentPlayhead: IMAAVPlayerContentPlayhead?
+    
+        var trackingTime: TimeInterval {
+            DebugLog("[TVOS] - CustomContentPlayhead: REQUEST TIME")
+            
+            guard
+                let player = self._player,
+                let item = player.currentItem
+            else {
+                guard let startPosition = _source?.startPosition, startPosition > 0 else {
+                    return 0
+                }
+                DebugLog("[TVOS] - CustomContentPlayhead: REQUEST TIME START POSITION: \(startPosition)")
+                return startPosition
+            }
+
+            let time = item.currentTime()
+            let res = time.isNumeric ? time.seconds : 0
+            DebugLog("[TVOS] - CustomContentPlayhead: REQUEST TIME PLAYER: \(res)")
+            return res
+        }
+    
     #endif
     private var _didRequestAds = false
     private var _adPlaying = false
@@ -782,7 +803,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         // PLAYER CARICATO
         // PREROLL ESEGUITI
         #if USE_GOOGLE_IMA
-        if _imaAdsManager.initAdsComplete(), self._isInitPlayerComplete {
+        if self.isInitComplete() {
             DebugLog("[TVOS] - tryToPlay EXECUTE")
             _playerLayer?.opacity = 1.0
             _player?.play()
@@ -1602,9 +1623,11 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                 self.setSeek(NSNumber(value: self._pendingSeekTime), NSNumber(value: 100))
                 self._pendingSeek = false
             }
-
+            
+            var currentTime = NSNumber(value: Float(CMTimeGetSeconds(_playerItem.currentTime())))
             if self._startPosition >= 0 {
-                self.setSeek(NSNumber(value: self._startPosition), NSNumber(value: 100))
+                currentTime = NSNumber(value: self._startPosition)
+                self.setSeek(currentTime, NSNumber(value: 100))
                 self._startPosition = -1
             }
 
@@ -1638,9 +1661,9 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
 
                 let audioTracks = await RCTVideoUtils.getAudioTrackInfo(self._player)
                 let textTracks = await RCTVideoUtils.getTextTrackInfo(self._player)
-                DebugLog("[TVOS] - ONVIDEOLOAD: \(_playerItem.currentTime()) - SECONDS: \(Float(CMTimeGetSeconds(_playerItem.currentTime())))")
+                DebugLog("[TVOS] - ONVIDEOLOAD: \(_playerItem.currentTime()) - SECONDS: \(currentTime)")
                 self.onVideoLoad?(["duration": NSNumber(value: duration),
-                                   "currentTime": NSNumber(value: Float(CMTimeGetSeconds(_playerItem.currentTime()))),
+                                   "currentTime": currentTime,
                                    "canPlayReverse": NSNumber(value: _playerItem.canPlayReverse),
                                    "canPlayFastForward": NSNumber(value: _playerItem.canPlayFastForward),
                                    "canPlaySlowForward": NSNumber(value: _playerItem.canPlaySlowForward),
@@ -1661,20 +1684,23 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             self._videoLoadStarted = false
             self._playerObserver.attachPlayerEventListeners()
             self.applyModifiers()
-            #if USE_GOOGLE_IMA
-                if _source?.adParams.adTagUrl != nil {
-                    // Set up your content playhead and contentComplete callback.
-                    _contentPlayhead = IMAAVPlayerContentPlayhead(avPlayer: _player!)
-                    DebugLog("[TVOS] - SETTT CONTENT PLAYHEAD")
-                    if !_didRequestAds && _source?.adParams.adTagUrl != nil {
-                        _imaAdsManager.requestAds()
-                        _didRequestAds = true
-                    }
-                    //_imaAdsManager.setUpAdsLoader()
-                }
-            #endif
+            self.requestImaAds()
             self._isInitPlayerComplete = true
         }
+    }
+    
+    func requestImaAds() {
+        #if USE_GOOGLE_IMA
+            if _source?.adParams.adTagUrl != nil {
+                // Set up your content playhead and contentComplete callback.
+                //_contentPlayhead = IMAAVPlayerContentPlayhead(avPlayer: _player!)
+                DebugLog("[TVOS] - SETTT CONTENT PLAYHEAD")
+                if !_didRequestAds && _source?.adParams.adTagUrl != nil {
+                    _imaAdsManager.requestAds()
+                    _didRequestAds = true
+                }
+            }
+        #endif
     }
 
     func handlePlaybackFailed() {
@@ -1941,4 +1967,3 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     @objc
     func setOnClick(_: Any) {}
 }
-
