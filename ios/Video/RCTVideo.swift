@@ -1367,7 +1367,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     private func initAdsLoader() {
         #if USE_GOOGLE_IMA
             if self._source?.adParams.adTagUrl != nil {
-                DebugLog("[TVOS] - SETTT ADS LOADER")
+                DebugLog("[TVOS] - Setup ads loader")
                 self._imaAdsManager.setUpAdsLoader()
             }
         #endif
@@ -1390,6 +1390,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     // MARK: - RCTIMAAdsManager
     func requestResume() {
         ///Not started yet: completing initialization
+        DebugLog("[TVOS] - Request Resume - AD playing: \(self._adPlaying), videoLoadStarted: \(self._videoLoadStarted)")
         if self._videoLoadStarted {
             self.loadPlayerItem()
         }else{
@@ -1401,6 +1402,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     
     func requestPause() {
         ///It hasn't started yet: I only pause if adPlaying
+        DebugLog("[TVOS] - Request pause - AD playing: \(self._adPlaying), videoLoadStarted: \(self._videoLoadStarted)")
         if self._videoLoadStarted {
             if self._adPlaying {
                 #if USE_GOOGLE_IMA
