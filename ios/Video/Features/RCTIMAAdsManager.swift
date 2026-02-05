@@ -41,7 +41,7 @@
             let adTagUrl = _video.getAdTagUrl()
             let contentPlayhead = _video.getContentPlayhead()
 
-            if adTagUrl != nil && contentPlayhead != nil {
+            if adTagUrl != nil {
                 // Create an ad request with our ad tag, display container, and optional user context.
                 let request = IMAAdsRequest(
                     adTagUrl: adTagUrl!,
@@ -107,7 +107,7 @@
             }
 
             guard let _video else { return }
-            _video.setPaused(false)
+            _video.requestResume()
             if _video.onReceiveAdEvent != nil {
                 _video.onReceiveAdEvent?([
                     "event": "ERROR",
@@ -233,7 +233,7 @@
             }
 
             // Fall back to playing content
-            _video.setPaused(false)
+            _video.requestResume()
         }
 
         func adsManagerAdPlaybackReady(_: IMAAdsManager) {
@@ -261,7 +261,7 @@
         func adsManagerDidRequestContentPause(_: IMAAdsManager) {
             guard let _video else { return }
             // Pause the content for the SDK to play ads.
-            _video.setPaused(true)
+            _video.requestPause()
             _video.setAdPlaying(true)
             if _video.onReceiveAdEvent != nil {
                 _video.onReceiveAdEvent?([
@@ -274,7 +274,7 @@
             guard let _video else { return }
             // Resume the content since the SDK is done playing ads (at least for now).
             _video.setAdPlaying(false)
-            _video.setPaused(false)
+            _video.requestResume()
             if _video.onReceiveAdEvent != nil {
                 _video.onReceiveAdEvent?([
                     "event": "CONTENT_RESUME_REQUESTED",
@@ -346,3 +346,4 @@
         }
     }
 #endif
+

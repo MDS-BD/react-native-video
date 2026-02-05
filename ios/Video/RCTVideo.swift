@@ -21,6 +21,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     /* Required to publish events */
     private var _eventDispatcher: RCTEventDispatcher?
     private var _videoLoadStarted = false
+    private var _playerIsReady = false
 
     private var _pendingSeek = false
     private var _pendingSeekTime: Float = 0.0
@@ -91,8 +92,23 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     /* IMA Ads */
     #if USE_GOOGLE_IMA
         private var _imaAdsManager: RCTIMAAdsManager!
-        /* Playhead used by the SDK to track content video progress and insert mid-rolls. */
-        private var _contentPlayhead: IMAAVPlayerContentPlayhead?
+        /// Playhead used by the SDK to track content video progress and insert mid-rolls. */
+        private var _contentPlayhead: RCTPlayerContentPlayhead?
+        
+        var trackingTime: TimeInterval {
+            
+            guard
+                let player = self._player,
+                let _ = player.currentItem,
+                self._playerIsReady
+            else {
+                return 0
+            }
+            
+            let time = player.currentTime()
+            let timeElapsed = Double(CMTimeGetSeconds(time))
+            return timeElapsed
+        }
     #endif
     private var _didRequestAds = false
     private var _adPlaying = false
@@ -287,6 +303,9 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         #if USE_GOOGLE_IMA
             _imaAdsManager?.releaseAds()
             _imaAdsManager = nil
+            _contentPlayhead?.release()
+            _contentPlayhead = nil
+            _didRequestAds = false
         #endif
 
         AudioSessionManager.shared.unregisterView(view: self)
@@ -416,10 +435,8 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     // MARK: - Progress
 
     func sendProgressUpdate(didEnd: Bool = false) {
-        #if !USE_GOOGLE_IMA
-            // If we dont use Ads and onVideoProgress is not defined we dont need to run this code
-            guard onVideoProgress != nil else { return }
-        #endif
+        // If onVideoProgress is not defined we dont need to run this code
+        guard onVideoProgress != nil else { return }
 
         if let video = _player?.currentItem,
            video.status != AVPlayerItem.Status.readyToPlay {
@@ -444,12 +461,6 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         }
 
         if currentTimeSecs >= 0 {
-            #if USE_GOOGLE_IMA
-                if !_didRequestAds && currentTimeSecs >= 0.0001 && _source?.adParams.adTagUrl != nil {
-                    _imaAdsManager.requestAds()
-                    _didRequestAds = true
-                }
-            #endif
             onVideoProgress?([
                 "currentTime": currentTimeSecs,
                 "playableDuration": RCTVideoUtils.calculatePlayableDuration(_player, withSource: _source),
@@ -624,16 +635,32 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             setAutomaticallyWaitsToMinimizeStalling(_automaticallyWaitsToMinimizeStalling)
         }
 
-        #if USE_GOOGLE_IMA
-            if _source?.adParams.adTagUrl != nil {
-                // Set up your content playhead and contentComplete callback.
-                _contentPlayhead = IMAAVPlayerContentPlayhead(avPlayer: _player!)
-
-                _imaAdsManager.setUpAdsLoader()
-            }
-        #endif
         isSetSourceOngoing = false
         applyNextSource()
+    }
+    
+    private func loadPlayerItem() {
+        // perform on next run loop, otherwise other passed react-props may not be set
+        RCTVideoUtils.delay { [weak self] in
+            do {
+                guard let self else { throw NSError(domain: "", code: 0, userInfo: nil) }
+
+                let playerItem = try await self.preparePlayerItem()
+                try await self.setupPlayer(playerItem: playerItem)
+            } catch {
+                DebugLog("An error occurred: \(error.localizedDescription)")
+
+                if let self {
+                    self.onVideoError?(["error": error.localizedDescription])
+                    self.isSetSourceOngoing = false
+                    self.applyNextSource()
+
+                    if let player = self._player {
+                        NowPlayingInfoCenterManager.shared.removePlayer(player: player)
+                    }
+                }
+            }
+        }
     }
 
     @objc
@@ -645,9 +672,11 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             return
         }
         self.isSetSourceOngoing = true
+        self._playerIsReady = false
 
         let initializeSource = {
             self._source = VideoSource(source)
+            self.initAdsLoader()
             if self._source?.uri == nil || self._source?.uri == "" {
                 self._player?.replaceCurrentItem(with: nil)
                 self.isSetSourceOngoing = false
@@ -669,28 +698,12 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             self._drmManager = nil
             self._playerObserver.playerItem = nil
 
-            // perform on next run loop, otherwise other passed react-props may not be set
-            RCTVideoUtils.delay { [weak self] in
-                do {
-                    guard let self else { throw NSError(domain: "", code: 0, userInfo: nil) }
-
-                    let playerItem = try await self.preparePlayerItem()
-                    try await self.setupPlayer(playerItem: playerItem)
-                } catch {
-                    DebugLog("An error occurred: \(error.localizedDescription)")
-
-                    if let self {
-                        self.onVideoError?(["error": error.localizedDescription])
-                        self.isSetSourceOngoing = false
-                        self.applyNextSource()
-
-                        if let player = self._player {
-                            NowPlayingInfoCenterManager.shared.removePlayer(player: player)
-                        }
-                    }
-                }
+            if let _ = self._source?.adParams.adTagUrl {
+                self.requestImaAds()
+            }else{
+                self.loadPlayerItem()
             }
-
+            
             self._videoLoadStarted = true
             self.applyNextSource()
         }
@@ -1349,8 +1362,58 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     func setFilterEnabled(_ filterEnabled: Bool) {
         _filterEnabled = filterEnabled
     }
-
+    
+    // MARK: - IMA
+    private func initAdsLoader() {
+        #if USE_GOOGLE_IMA
+            if self._source?.adParams.adTagUrl != nil {
+                DebugLog("[TVOS] - Setup ads loader")
+                self._imaAdsManager.setUpAdsLoader()
+            }
+        #endif
+    }
+    
+    private func requestImaAds() {
+        #if USE_GOOGLE_IMA
+            DispatchQueue.main.sync {
+                DebugLog("[TVOS] - Request IMA Ads \(_source?.adParams.adTagUrl ?? "nil")")
+                if !_didRequestAds, _source?.adParams.adTagUrl != nil {
+                    _contentPlayhead = RCTPlayerContentPlayhead(video: self)
+                    _imaAdsManager.requestAds()
+                    DebugLog("[TVOS] - Request IMA Ads DONE")
+                    _didRequestAds = true
+                }
+            }
+        #endif
+    }
+    
     // MARK: - RCTIMAAdsManager
+    func requestResume() {
+        ///Not started yet: completing initialization
+        DebugLog("[TVOS] - Request Resume - AD playing: \(self._adPlaying), videoLoadStarted: \(self._videoLoadStarted)")
+        if self._videoLoadStarted {
+            self.loadPlayerItem()
+        }else{
+            ///Video already instanced: I'll play it
+            _playerLayer?.isHidden = false
+            self.setPaused(false)
+        }
+    }
+    
+    func requestPause() {
+        ///It hasn't started yet: I only pause if adPlaying
+        DebugLog("[TVOS] - Request pause - AD playing: \(self._adPlaying), videoLoadStarted: \(self._videoLoadStarted)")
+        if self._videoLoadStarted {
+            if self._adPlaying {
+                #if USE_GOOGLE_IMA
+                    _imaAdsManager.getAdsManager()?.pause()
+                #endif
+            }
+        }else{
+            self.setPaused(true)
+            _playerLayer?.isHidden = true
+        }
+    }
 
     func getAdLanguage() -> String? {
         return _source?.adParams.adLanguage
@@ -1369,7 +1432,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     }
 
     #if USE_GOOGLE_IMA
-        func getContentPlayhead() -> IMAAVPlayerContentPlayhead? {
+        func getContentPlayhead() -> RCTPlayerContentPlayhead? {
             return _contentPlayhead
         }
     #endif
@@ -1448,6 +1511,11 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         _player = nil
         _drmManager = nil
         _playerObserver.clearPlayer()
+        #if USE_GOOGLE_IMA
+            _contentPlayhead?.release()
+            _contentPlayhead = nil
+            _didRequestAds = false
+        #endif
 
         self.removePlayerLayer()
 
@@ -1497,6 +1565,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         if _isBuffering {
             _isBuffering = false
         }
+        self._playerIsReady = true
         onReadyForDisplay?([
             "target": reactTag as Any,
         ])
@@ -1558,8 +1627,10 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                 self._pendingSeek = false
             }
 
+            var currentTime = NSNumber(value: Float(CMTimeGetSeconds(_playerItem.currentTime())))
             if self._startPosition >= 0 {
-                self.setSeek(NSNumber(value: self._startPosition), NSNumber(value: 100))
+                currentTime = NSNumber(value: self._startPosition)
+                self.setSeek(currentTime, NSNumber(value: 100))
                 self._startPosition = -1
             }
 
@@ -1594,7 +1665,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                 let audioTracks = await RCTVideoUtils.getAudioTrackInfo(self._player)
                 let textTracks = await RCTVideoUtils.getTextTrackInfo(self._player)
                 self.onVideoLoad?(["duration": NSNumber(value: duration),
-                                   "currentTime": NSNumber(value: Float(CMTimeGetSeconds(_playerItem.currentTime()))),
+                                   "currentTime": currentTime,
                                    "canPlayReverse": NSNumber(value: _playerItem.canPlayReverse),
                                    "canPlayFastForward": NSNumber(value: _playerItem.canPlayFastForward),
                                    "canPlaySlowForward": NSNumber(value: _playerItem.canPlaySlowForward),
