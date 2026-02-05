@@ -10,8 +10,8 @@ class RCTPlayerContentPlayhead: NSObject, IMAContentPlayhead {
     private weak var _video: RCTVideo?
     
     init(video: RCTVideo) {
-        self._video = video
         super.init()
+        self._video = video
     }
     
     deinit {
