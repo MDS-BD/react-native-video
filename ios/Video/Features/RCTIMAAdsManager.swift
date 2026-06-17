@@ -11,6 +11,11 @@
         /* Main point of interaction with the SDK. Created by the SDK as the result of an ad request. */
         private var adsManager: IMAAdsManager!
 
+        /* Retry state for requestAds when view is not yet in hierarchy */
+        private var _requestAdsRetryCount: Int = 0
+        private let _requestAdsMaxRetries: Int = 10
+        private let _requestAdsRetryDelayMs: Double = 100
+
         init(video: RCTVideo!, isPictureInPictureActive: @escaping () -> Bool) {
             _video = video
             _isPictureInPictureActive = isPictureInPictureActive
@@ -29,6 +34,32 @@
         }
 
         func requestAds() {
+            guard let _video else { return }
+
+            // IMA requires the ad container to be attached to the view hierarchy before requesting ads.
+            // If the view is not yet in the window, retry up to _requestAdsMaxRetries times.
+            guard _video.window != nil else {
+                if _requestAdsRetryCount < _requestAdsMaxRetries {
+                    _requestAdsRetryCount += 1
+                    DispatchQueue.main.asyncAfter(deadline: .now() + _requestAdsRetryDelayMs / 1000.0) { [weak self] in
+                        self?.requestAds()
+                    }
+                } else {
+                    _requestAdsRetryCount = 0
+                    // Max retries reached: attempt the request anyway — worst case only midrolls will play
+                    DispatchQueue.main.async { [weak self] in
+                        self?.performRequestAds()
+                    }
+                }
+                return
+            }
+
+            // Reset retry counter on success
+            _requestAdsRetryCount = 0
+            performRequestAds()
+        }
+
+        private func performRequestAds() {
             guard let _video else { return }
             // fixes RCTVideo --> RCTIMAAdsManager --> IMAAdsLoader --> IMAAdDisplayContainer --> RCTVideo memory leak.
             let adContainerView = UIView(frame: _video.bounds)
