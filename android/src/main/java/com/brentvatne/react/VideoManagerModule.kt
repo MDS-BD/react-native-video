@@ -93,6 +93,12 @@ class VideoManagerModule(reactContext: ReactApplicationContext?) : ReactContextB
         }
     }
 
+    @ReactMethod
+    @Suppress("UNUSED_PARAMETER") // codegen compatibility
+    fun stop(reactTag: Int) {
+        // No-op: resources are released in ReactExoplayerViewManager.onDropViewInstance
+    }
+
     companion object {
         private const val REACT_CLASS = "VideoManager"
     }
