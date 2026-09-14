@@ -836,7 +836,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
 
       return () => {
         if (reactTag) {
-          NativeVideoManager.stop?.(reactTag);
+          NativeVideoManager.stop(reactTag);
         }
       };
     }, []);
