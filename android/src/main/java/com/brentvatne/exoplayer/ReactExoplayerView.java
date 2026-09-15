@@ -238,7 +238,7 @@ public class ReactExoplayerView extends FrameLayout implements
     private String textTrackType = "disabled";
     private String textTrackValue;
     private boolean disableFocus;
-    private boolean focusable = true;
+    private boolean focusable = false;
     private BufferingStrategy.BufferingStrategyEnum bufferingStrategy;
     private boolean disableDisconnectError;
     private boolean preventsDisplaySleepDuringVideoPlayback = true;
@@ -246,6 +246,8 @@ public class ReactExoplayerView extends FrameLayout implements
     protected boolean playInBackground = false;
     private boolean mReportBandwidth = false;
     private boolean controls = false;
+    private boolean imaContentPaused = false;
+    private boolean wasPlayingAd = false;
 
     private boolean showNotificationControls = false;
     // \ End props
@@ -354,7 +356,10 @@ public class ReactExoplayerView extends FrameLayout implements
         exoPlayerView.setLayoutParams(layoutParams);
         addView(exoPlayerView, 0, layoutParams);
 
-        exoPlayerView.setFocusable(this.focusable);
+        setFocusable(false);
+        setFocusableInTouchMode(false);
+        setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        exoPlayerView.setFocusable(false);
     }
 
     @Override
@@ -1220,6 +1225,9 @@ public class ReactExoplayerView extends FrameLayout implements
             player = null;
         }
 
+        imaContentPaused = false;
+        wasPlayingAd = false;
+
         if (adsLoader != null) {
             adsLoader.release();
             adsLoader = null;
@@ -1439,6 +1447,28 @@ public class ReactExoplayerView extends FrameLayout implements
             }
             DebugLog.d(TAG, text);
         }
+
+        if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED)
+                || events.contains(Player.EVENT_IS_PLAYING_CHANGED)) {
+            boolean playingAd = isPlayingAd();
+            if (wasPlayingAd && !playingAd) {
+                imaContentPaused = false;
+                eventEmitter.onReceiveAdEvent.invoke("CONTENT_RESUME_REQUESTED", null);
+            }
+            wasPlayingAd = playingAd;
+            maybeResumeContentAfterAds();
+        }
+    }
+
+    private void maybeResumeContentAfterAds() {
+        if (player == null || !imaContentPaused || isPlayingAd()) {
+            return;
+        }
+        if (player.getPlaybackState() != Player.STATE_READY || !player.isPlaying()) {
+            return;
+        }
+        imaContentPaused = false;
+        eventEmitter.onReceiveAdEvent.invoke("CONTENT_RESUME_REQUESTED", null);
     }
 
     private void startProgressHandler() {
@@ -2589,7 +2619,10 @@ public class ReactExoplayerView extends FrameLayout implements
 
     public void setFocusable(boolean focusable) {
         this.focusable = focusable;
-        exoPlayerView.setFocusable(this.focusable);
+        super.setFocusable(false);
+        setFocusableInTouchMode(false);
+        // PlayerView may take D-pad only when built-in controls are enabled.
+        exoPlayerView.setFocusable(this.controls && focusable);
     }
 
     public void setShowNotificationControls(boolean showNotificationControls) {
@@ -2692,6 +2725,8 @@ public class ReactExoplayerView extends FrameLayout implements
         this.controls = controls;
         if (exoPlayerView != null) {
             exoPlayerView.setUseController(controls);
+            setDescendantFocusability(
+                controls ? ViewGroup.FOCUS_AFTER_DESCENDANTS : ViewGroup.FOCUS_BLOCK_DESCENDANTS);
             // Additional configuration for proper touch handling
             if (controls) {
                 exoPlayerView.setControllerAutoShow(true);
@@ -2715,11 +2750,18 @@ public class ReactExoplayerView extends FrameLayout implements
 
     @Override
     public void onAdEvent(AdEvent adEvent) {
+        String type = adEvent.getType() != null ? adEvent.getType().name() : "";
         if (adEvent.getAdData() != null) {
-            eventEmitter.onReceiveAdEvent.invoke(adEvent.getType().name(), adEvent.getAdData());
+            eventEmitter.onReceiveAdEvent.invoke(type, adEvent.getAdData());
         } else {
-            eventEmitter.onReceiveAdEvent.invoke(adEvent.getType().name(), null);
+            eventEmitter.onReceiveAdEvent.invoke(type, null);
         }
+        if ("CONTENT_PAUSE_REQUESTED".equals(type)) {
+            imaContentPaused = true;
+        } else if ("CONTENT_RESUME_REQUESTED".equals(type)) {
+            imaContentPaused = false;
+        }
+        maybeResumeContentAfterAds();
     }
 
     @Override
@@ -2731,6 +2773,10 @@ public class ReactExoplayerView extends FrameLayout implements
                 "type", String.valueOf(error.getErrorType())
         );
         eventEmitter.onReceiveAdEvent.invoke("ERROR", errMap);
+        if (imaContentPaused && !isPlayingAd()) {
+            imaContentPaused = false;
+            eventEmitter.onReceiveAdEvent.invoke("CONTENT_RESUME_REQUESTED", null);
+        }
     }
 
     public void setControlsStyles(ControlsConfig controlsStyles) {

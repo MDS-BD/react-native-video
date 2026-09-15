@@ -2,8 +2,10 @@ package com.brentvatne.exoplayer
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
+import android.view.KeyEvent
 import android.view.View
 import android.view.View.MeasureSpec
 import android.view.ViewGroup
@@ -37,13 +39,40 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
         visibility = View.GONE
     }
 
-    private val playerView = PlayerView(context).apply {
+    /**
+     * Media3 [PlayerView] consumes D-pad / media keys and requests focus even with
+     * `useController = false`. On Android TV that steals the remote from the JS overlay
+     * (live info / Up). This subclass only handles keys when native controls are on.
+     */
+    @UnstableApi
+    private class TvSafePlayerView(context: Context) : PlayerView(context) {
+        override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+            if (!useController) {
+                return false
+            }
+            return super.dispatchKeyEvent(event)
+        }
+
+        override fun onRequestFocusInDescendants(direction: Int, previouslyFocusedRect: Rect?): Boolean {
+            if (!useController) {
+                return false
+            }
+            return super.onRequestFocusInDescendants(direction, previouslyFocusedRect)
+        }
+
+        override fun requestFocus(direction: Int, previouslyFocusedRect: Rect?): Boolean {
+            if (!useController) {
+                return false
+            }
+            return super.requestFocus(direction, previouslyFocusedRect)
+        }
+    }
+
+    private val playerView = TvSafePlayerView(context).apply {
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         setShutterBackgroundColor(Color.TRANSPARENT)
         // Controls are disabled by default (matches the `controls` prop default)
         useController = false
-        // Prevent the hidden controller buttons from stealing focus (e.g. D-pad on Android TV)
-        descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         controllerAutoShow = true
         controllerHideOnTouch = true
         controllerShowTimeoutMs = 5000
@@ -65,6 +94,8 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
         val liveBadgeLayoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
         liveBadgeLayoutParams.setMargins(16, 16, 16, 16)
         addView(liveBadge, liveBadgeLayoutParams)
+
+        applyControllerFocusPolicy()
     }
 
     fun setPlayer(player: ExoPlayer?) {
@@ -83,6 +114,7 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
             pendingResizeMode?.let { resizeMode ->
                 playerView.resizeMode = resizeMode
             }
+            applyControllerFocusPolicy()
         }
     }
 
@@ -162,8 +194,7 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
 
     fun setUseController(useController: Boolean) {
         playerView.useController = useController
-        playerView.descendantFocusability =
-            if (useController) ViewGroup.FOCUS_AFTER_DESCENDANTS else ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        applyControllerFocusPolicy()
         updateLiveUi()
         if (useController) {
             // Ensure proper touch handling when controls are enabled
@@ -171,6 +202,32 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
             playerView.controllerHideOnTouch = true
             // Show controls immediately when enabled
             playerView.showController()
+        }
+    }
+
+    /**
+     * RN View applies `focusable=true` by default on Android TV ([ReactExoplayerViewManager]).
+     * That must not re-enable [PlayerView] while native controls are off.
+     */
+    private fun applyControllerFocusPolicy(clearIfBlocked: Boolean = true) {
+        val allowFocus = playerView.useController
+        val descendantPolicy =
+            if (allowFocus) ViewGroup.FOCUS_AFTER_DESCENDANTS else ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        descendantFocusability = descendantPolicy
+        playerView.descendantFocusability = descendantPolicy
+        super.setFocusable(false)
+        isFocusableInTouchMode = false
+        playerView.isFocusable = allowFocus
+        playerView.isFocusableInTouchMode = allowFocus
+        playerView.videoSurfaceView?.let { surface ->
+            surface.isFocusable = allowFocus
+            surface.isFocusableInTouchMode = allowFocus
+        }
+        if (!allowFocus && clearIfBlocked) {
+            playerView.clearFocus()
+            if (hasFocus()) {
+                clearFocus()
+            }
         }
     }
 
@@ -213,7 +270,8 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
     }
 
     override fun setFocusable(focusable: Boolean) {
-        playerView.isFocusable = focusable
+        playerView.isFocusable = focusable && playerView.useController
+        applyControllerFocusPolicy()
     }
 
     fun setLiveLabel(label: String?) {
@@ -233,6 +291,8 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
         // Disable/enable scrubbing based on seekable
         val timeBar = playerView.findViewById<DefaultTimeBar?>(androidx.media3.ui.R.id.exo_progress)
         timeBar?.isEnabled = !isLive || seekable
+
+        applyControllerFocusPolicy(clearIfBlocked = false)
     }
 
     private val playerListener = object : Player.Listener {

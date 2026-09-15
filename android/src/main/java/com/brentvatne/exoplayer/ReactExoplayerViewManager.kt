@@ -200,7 +200,7 @@ class ReactExoplayerViewManager(private val config: ReactExoplayerConfig) : View
         videoView.setDisableFocus(disableFocus)
     }
 
-    @ReactProp(name = PROP_FOCUSABLE, defaultBoolean = true)
+    @ReactProp(name = PROP_FOCUSABLE, defaultBoolean = false)
     fun setFocusable(videoView: ReactExoplayerView, focusable: Boolean) {
         videoView.setFocusable(focusable)
     }
