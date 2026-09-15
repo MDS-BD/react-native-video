@@ -456,7 +456,7 @@ public class ReactExoplayerView extends FrameLayout implements
     private void updateControllerVisibility() {
         if (exoPlayerView == null) return;
             
-        exoPlayerView.setUseController(!controlsConfig.getHideFullscreen());
+        exoPlayerView.setUseController(controls && !controlsConfig.getHideFullscreen());
     }
 
     private void openSettings() {
@@ -2735,6 +2735,7 @@ public class ReactExoplayerView extends FrameLayout implements
 
     public void setControlsStyles(ControlsConfig controlsStyles) {
         controlsConfig = controlsStyles;
+        exoPlayerView.setLiveLabel(controlsConfig.getLiveLabel());
         refreshControlsStyles();
     }
 }
