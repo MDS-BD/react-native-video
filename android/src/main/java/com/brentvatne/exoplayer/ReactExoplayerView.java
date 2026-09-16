@@ -129,17 +129,22 @@ import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.UiThreadUtil;
 import com.facebook.react.uimanager.ThemedReactContext;
+import com.google.ads.interactivemedia.v3.api.Ad;
 import com.google.ads.interactivemedia.v3.api.AdError;
 import com.google.ads.interactivemedia.v3.api.AdErrorEvent;
 import com.google.ads.interactivemedia.v3.api.AdEvent;
+import com.google.ads.interactivemedia.v3.api.AdPodInfo;
 import com.google.ads.interactivemedia.v3.api.ImaSdkFactory;
 import com.google.ads.interactivemedia.v3.api.ImaSdkSettings;
+import com.google.ads.interactivemedia.v3.api.UniversalAdId;
 import com.google.common.collect.ImmutableList;
 
 import java.net.CookieHandler;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -182,6 +187,7 @@ public class ReactExoplayerView extends FrameLayout implements
     private ExoPlayerView exoPlayerView;
     private FullScreenPlayerView fullScreenPlayerView;
     private ImaAdsLoader adsLoader;
+    private boolean adsManagerLoadedNotified = false;
 
     private DataSource.Factory mediaDataSourceFactory;
     private ExoPlayer player;
@@ -765,6 +771,7 @@ public class ReactExoplayerView extends FrameLayout implements
     }
 
     private AdsMediaSource initializeAds(MediaSource videoSource, Source runningSource) {
+        adsManagerLoadedNotified = false;
         AdsProps adProps = runningSource.getAdsProps();
         Uri uri = runningSource.getUri();
         if (adProps != null && uri != null) {
@@ -1825,7 +1832,35 @@ public class ReactExoplayerView extends FrameLayout implements
 
     @Override
     public void onTimelineChanged(@NonNull Timeline timeline, int reason) {
-        // Do nothing.
+        maybeNotifyAdsManagerLoaded(timeline);
+    }
+
+    /**
+     * IMA android has no equivalent of the iOS `ADS_MANAGER_LOADED` event, but the ad cue points
+     * show up in the timeline as soon as the ads manager is loaded, so the event is emitted from there.
+     */
+    private void maybeNotifyAdsManagerLoaded(Timeline timeline) {
+        if (adsManagerLoadedNotified || adsLoader == null || player == null || timeline.isEmpty()) {
+            return;
+        }
+
+        Timeline.Period period = timeline.getPeriod(player.getCurrentPeriodIndex(), new Timeline.Period());
+        int adGroupCount = period.getAdGroupCount();
+        if (adGroupCount == 0) {
+            return;
+        }
+
+        List<Double> adCuePoints = new ArrayList<>();
+        for (int i = 0; i < adGroupCount; i++) {
+            long adGroupTimeUs = period.getAdGroupTimeUs(i);
+            // As on iOS, a postroll is reported as -1
+            adCuePoints.add(adGroupTimeUs == C.TIME_END_OF_SOURCE ? -1d : adGroupTimeUs / 1000_000d);
+        }
+
+        adsManagerLoadedNotified = true;
+        Map<String, Object> data = new HashMap<>();
+        data.put("adCuePoints", adCuePoints);
+        eventEmitter.onReceiveAdEvent.invoke("ADS_MANAGER_LOADED", data);
     }
 
     @Override
@@ -2715,11 +2750,95 @@ public class ReactExoplayerView extends FrameLayout implements
 
     @Override
     public void onAdEvent(AdEvent adEvent) {
+        AdEvent.AdEventType type = adEvent.getType();
+        Map<String, Object> data = new HashMap<>();
+
         if (adEvent.getAdData() != null) {
-            eventEmitter.onReceiveAdEvent.invoke(adEvent.getType().name(), adEvent.getAdData());
-        } else {
-            eventEmitter.onReceiveAdEvent.invoke(adEvent.getType().name(), null);
+            data.putAll(adEvent.getAdData());
         }
+
+        if (type == AdEvent.AdEventType.AD_PROGRESS) {
+            // As on iOS, progress only carries the times: it is fired several times per second
+            if (isPlayingAd()) {
+                // IMA android doesn't provide the progress in the event data, unlike iOS
+                data.put("mediaTime", player.getCurrentPosition() / 1000d);
+                long adDuration = player.getDuration();
+                data.put("totalTime", adDuration == C.TIME_UNSET ? 0d : adDuration / 1000d);
+            }
+        } else {
+            data.putAll(adToMap(adEvent.getAd()));
+        }
+
+        eventEmitter.onReceiveAdEvent.invoke(getAdEventName(type), data.isEmpty() ? null : data);
+    }
+
+    /// Aligns android event names with the ones emitted on iOS
+    private String getAdEventName(AdEvent.AdEventType type) {
+        if (type == AdEvent.AdEventType.CLICKED) {
+            return "CLICK";
+        }
+        return type.name();
+    }
+
+    /// Exposes the ad properties as iOS does, as the android event data is empty for most events
+    private Map<String, Object> adToMap(Ad ad) {
+        Map<String, Object> adInfo = new HashMap<>();
+        if (ad == null) {
+            return adInfo;
+        }
+
+        adInfo.put("adDescription", ad.getDescription());
+        adInfo.put("adId", ad.getAdId());
+        adInfo.put("adSystem", ad.getAdSystem());
+        adInfo.put("adTitle", ad.getTitle());
+        adInfo.put("advertiserName", ad.getAdvertiserName());
+        adInfo.put("contentType", ad.getContentType());
+        adInfo.put("creativeAdId", ad.getCreativeAdId());
+        adInfo.put("creativeId", ad.getCreativeId());
+        adInfo.put("dealId", ad.getDealId());
+        adInfo.put("duration", ad.getDuration());
+        adInfo.put("height", ad.getHeight());
+        adInfo.put("isLinear", ad.isLinear());
+        adInfo.put("isSkippable", ad.isSkippable());
+        adInfo.put("isUiDisabled", ad.isUiDisabled());
+        adInfo.put("skipTimeOffset", ad.getSkipTimeOffset());
+        adInfo.put("surveyURL", ad.getSurveyUrl());
+        adInfo.put("traffickingParameters", ad.getTraffickingParameters());
+        adInfo.put("vastMediaBitrate", ad.getVastMediaBitrate());
+        adInfo.put("vastMediaHeight", ad.getVastMediaHeight());
+        adInfo.put("vastMediaWidth", ad.getVastMediaWidth());
+        adInfo.put("width", ad.getWidth());
+        adInfo.put("wrapperAdIDs", asListOrEmpty(ad.getAdWrapperIds()));
+        adInfo.put("wrapperCreativeIDs", asListOrEmpty(ad.getAdWrapperCreativeIds()));
+        adInfo.put("wrapperSystems", asListOrEmpty(ad.getAdWrapperSystems()));
+
+        List<Map<String, Object>> universalAdIDs = new ArrayList<>();
+        if (ad.getUniversalAdIds() != null) {
+            for (UniversalAdId universalAdId : ad.getUniversalAdIds()) {
+                Map<String, Object> id = new HashMap<>();
+                id.put("adIDValue", universalAdId.getAdIdValue());
+                id.put("adIDRegistry", universalAdId.getAdIdRegistry());
+                universalAdIDs.add(id);
+            }
+        }
+        adInfo.put("universalAdIDs", universalAdIDs);
+
+        AdPodInfo adPodInfo = ad.getAdPodInfo();
+        if (adPodInfo != null) {
+            Map<String, Object> podInfo = new HashMap<>();
+            podInfo.put("adPosition", adPodInfo.getAdPosition());
+            podInfo.put("totalAds", adPodInfo.getTotalAds());
+            podInfo.put("isBumper", adPodInfo.isBumper());
+            podInfo.put("podIndex", adPodInfo.getPodIndex());
+            podInfo.put("timeOffset", adPodInfo.getTimeOffset());
+            adInfo.put("adPodInfo", podInfo);
+        }
+
+        return adInfo;
+    }
+
+    private List<String> asListOrEmpty(String[] values) {
+        return values == null ? new ArrayList<>() : Arrays.asList(values);
     }
 
     @Override

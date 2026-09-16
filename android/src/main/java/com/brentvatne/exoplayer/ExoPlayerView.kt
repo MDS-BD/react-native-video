@@ -6,7 +6,6 @@ import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
 import android.view.View
 import android.view.View.MeasureSpec
-import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.media3.common.Player
@@ -42,8 +41,6 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
         setShutterBackgroundColor(Color.TRANSPARENT)
         // Controls are disabled by default (matches the `controls` prop default)
         useController = false
-        // Prevent the hidden controller buttons from stealing focus (e.g. D-pad on Android TV)
-        descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         controllerAutoShow = true
         controllerHideOnTouch = true
         controllerShowTimeoutMs = 5000
@@ -162,8 +159,6 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
 
     fun setUseController(useController: Boolean) {
         playerView.useController = useController
-        playerView.descendantFocusability =
-            if (useController) ViewGroup.FOCUS_AFTER_DESCENDANTS else ViewGroup.FOCUS_BLOCK_DESCENDANTS
         updateLiveUi()
         if (useController) {
             // Ensure proper touch handling when controls are enabled

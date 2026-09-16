@@ -90,7 +90,7 @@ class VideoEventEmitter {
     lateinit var onTextTracks: (textTracks: ArrayList<Track>?) -> Unit
     lateinit var onVideoTracks: (videoTracks: ArrayList<VideoTrack>?) -> Unit
     lateinit var onTextTrackDataChanged: (textTrackData: String) -> Unit
-    lateinit var onReceiveAdEvent: (adEvent: String, adData: Map<String?, String?>?) -> Unit
+    lateinit var onReceiveAdEvent: (adEvent: String, adData: Map<String, Any?>?) -> Unit
     lateinit var onPictureInPictureStatusChanged: (isActive: Boolean) -> Unit
 
     fun addEventEmitters(reactContext: ThemedReactContext, view: ReactExoplayerView) {
@@ -268,16 +268,7 @@ class VideoEventEmitter {
             onReceiveAdEvent = { adEvent, adData ->
                 event.dispatch(EventTypes.EVENT_ON_RECEIVE_AD_EVENT) {
                     putString("event", adEvent)
-                    putMap(
-                        "data",
-                        Arguments.createMap().apply {
-                            adData?.let { data ->
-                                for ((key, value) in data) {
-                                    putString(key!!, value)
-                                }
-                            }
-                        }
-                    )
+                    putMap("data", adData.toWritableMap())
                 }
             }
             onPictureInPictureStatusChanged = { isActive ->
@@ -294,12 +285,59 @@ class VideoEventEmitter {
         override fun getEventName(): String = "top${event.eventName.removePrefix("on")}"
 
         override fun getEventData(): WritableMap? = Arguments.createMap().apply(paramsSetter ?: {})
+
+        // Ad events are discrete and often fired in bursts (e.g. COMPLETED, CONTENT_RESUME_REQUESTED,
+        // ALL_ADS_COMPLETED): coalescing would deliver only the last one to JS
+        override fun canCoalesce(): Boolean = event != EventTypes.EVENT_ON_RECEIVE_AD_EVENT
     }
 
     private class EventBuilder(private val surfaceId: Int, private val viewId: Int, private val dispatcher: EventDispatcher) {
         fun dispatch(event: EventTypes, paramsSetter: (WritableMap.() -> Unit)? = null) =
             dispatcher.dispatchEvent(VideoCustomEvent(surfaceId, viewId, event, paramsSetter))
     }
+
+    /**
+     * Converts ad data (nested maps, lists and primitives, as provided by the IMA SDK)
+     * into the bridge representation expected by JS.
+     */
+    private fun Map<String, Any?>?.toWritableMap(): WritableMap =
+        Arguments.createMap().apply {
+            this@toWritableMap?.forEach { (key, value) -> putAdValue(key, value) }
+        }
+
+    private fun WritableMap.putAdValue(key: String, value: Any?) {
+        when (value) {
+            null -> putNull(key)
+            is String -> putString(key, value)
+            is Boolean -> putBoolean(key, value)
+            is Int -> putInt(key, value)
+            is Number -> putDouble(key, value.toDouble())
+            is Map<*, *> -> putMap(key, value.toAdWritableMap())
+            is Iterable<*> -> putArray(key, value.toAdWritableArray())
+            else -> putString(key, value.toString())
+        }
+    }
+
+    private fun Map<*, *>.toAdWritableMap(): WritableMap =
+        Arguments.createMap().apply {
+            forEach { (key, value) -> key?.let { putAdValue(it.toString(), value) } }
+        }
+
+    private fun Iterable<*>.toAdWritableArray(): WritableArray =
+        Arguments.createArray().apply {
+            forEach { value ->
+                when (value) {
+                    null -> pushNull()
+                    is String -> pushString(value)
+                    is Boolean -> pushBoolean(value)
+                    is Int -> pushInt(value)
+                    is Number -> pushDouble(value.toDouble())
+                    is Map<*, *> -> pushMap(value.toAdWritableMap())
+                    is Iterable<*> -> pushArray(value.toAdWritableArray())
+                    else -> pushString(value.toString())
+                }
+            }
+        }
 
     private fun audioTracksToArray(audioTracks: java.util.ArrayList<Track>?): WritableArray =
         Arguments.createArray().apply {
