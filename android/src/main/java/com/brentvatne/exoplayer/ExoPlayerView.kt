@@ -25,7 +25,7 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
     private var localStyle = SubtitleStyle()
     private var pendingResizeMode: Int? = null
     private val liveBadge: TextView = TextView(context).apply {
-        text = "LIVE"
+        text = DEFAULT_LIVE_LABEL
         setTextColor(Color.WHITE)
         textSize = 12f
         val drawable = GradientDrawable()
@@ -39,7 +39,8 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
     private val playerView = PlayerView(context).apply {
         layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         setShutterBackgroundColor(Color.TRANSPARENT)
-        useController = true
+        // Controls are disabled by default (matches the `controls` prop default)
+        useController = false
         controllerAutoShow = true
         controllerHideOnTouch = true
         controllerShowTimeoutMs = 5000
@@ -158,6 +159,7 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
 
     fun setUseController(useController: Boolean) {
         playerView.useController = useController
+        updateLiveUi()
         if (useController) {
             // Ensure proper touch handling when controls are enabled
             playerView.controllerAutoShow = true
@@ -209,13 +211,19 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
         playerView.isFocusable = focusable
     }
 
-    private fun updateLiveUi() {
-        val player = playerView.player ?: return
-        val isLive = player.isCurrentMediaItemLive
-        val seekable = player.isCurrentMediaItemSeekable
+    fun setLiveLabel(label: String?) {
+        liveBadge.text = label ?: DEFAULT_LIVE_LABEL
+    }
 
-        // Show/hide badge
-        liveBadge.visibility = if (isLive) View.VISIBLE else View.GONE
+    private fun updateLiveUi() {
+        val player = playerView.player
+        val isLive = player?.isCurrentMediaItemLive ?: false
+
+        // The badge is part of the native controls: show it only when they are enabled
+        liveBadge.visibility = if (isLive && playerView.useController) View.VISIBLE else View.GONE
+
+        if (player == null) return
+        val seekable = player.isCurrentMediaItemSeekable
 
         // Disable/enable scrubbing based on seekable
         val timeBar = playerView.findViewById<DefaultTimeBar?>(androidx.media3.ui.R.id.exo_progress)
@@ -254,6 +262,7 @@ class ExoPlayerView @JvmOverloads constructor(context: Context, attrs: Attribute
 
     companion object {
         private const val TAG = "ExoPlayerView"
+        private const val DEFAULT_LIVE_LABEL = "LIVE"
     }
 
     /**
