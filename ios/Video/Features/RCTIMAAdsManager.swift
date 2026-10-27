@@ -96,6 +96,8 @@
             adsManager.volume = 0
             adsManager.pause()
             adsManager.destroy()
+            // The destroyed manager must not be used by the next source (e.g. pause/resume while not playing ads)
+            self.adsManager = nil
         }
 
         // MARK: - Getters
