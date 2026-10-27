@@ -675,6 +675,8 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         self._playerIsReady = false
 
         let initializeSource = {
+            // A reused view loading a new source must start a new IMA session (see resetImaAds)
+            self.resetImaAds()
             self._source = VideoSource(source)
             self.initAdsLoader()
             if self._source?.uri == nil || self._source?.uri == "" {
@@ -1373,6 +1375,24 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         #endif
     }
     
+    /// Releases the IMA session of the previous source.
+    /// `_didRequestAds` is otherwise reset only when the view is destroyed: on a reused view the new source
+    /// would never request its ads, and since a source with an ad tag waits for IMA to load the content,
+    /// the player would stay buffering forever.
+    private func resetImaAds() {
+        #if USE_GOOGLE_IMA
+            DispatchQueue.main.sync {
+                guard _didRequestAds else { return }
+                DebugLog("[TVOS] - Reset IMA Ads of the previous source")
+                _imaAdsManager?.releaseAds()
+                _contentPlayhead?.release()
+                _contentPlayhead = nil
+                _didRequestAds = false
+                _adPlaying = false
+            }
+        #endif
+    }
+
     private func requestImaAds() {
         #if USE_GOOGLE_IMA
             DispatchQueue.main.sync {
