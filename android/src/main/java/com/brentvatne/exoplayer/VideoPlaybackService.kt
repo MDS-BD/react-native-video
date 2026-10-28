@@ -56,7 +56,13 @@ class VideoPlaybackService : MediaSessionService() {
         }
         sourceActivity = from
 
-        val mediaSession = MediaSession.Builder(this, player)
+        // Fire OS gets the same command rules as the in-player voice control session, other devices stay unchanged
+        val sessionBuilder = if (PlayerMediaSession.isFireTv(this)) {
+            PlayerMediaSession.builder(this, player)
+        } else {
+            MediaSession.Builder(this, player)
+        }
+        val mediaSession = sessionBuilder
             .setId("RNVideoPlaybackService_" + player.hashCode())
             .setCallback(VideoPlaybackCallback())
             .setCustomLayout(immutableListOf(seekForwardBtn, seekBackwardBtn))
@@ -119,13 +125,13 @@ class VideoPlaybackService : MediaSessionService() {
         }
 
         if (session.player.currentMediaItem == null) {
-            notificationManager.cancel(session.player.hashCode())
+            notificationManager.cancel(session.playerId())
             return
         }
 
         val notification = buildNotification(session)
 
-        notificationManager.notify(session.player.hashCode(), notification)
+        notificationManager.notify(session.playerId(), notification)
     }
 
     private fun buildNotification(session: MediaSession): Notification {
@@ -144,7 +150,7 @@ class VideoPlaybackService : MediaSessionService() {
                 .setContentIntent(PendingIntent.getActivity(this, 0, returnToPlayer, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
                 .build()
         } else {
-            val playerId = session.player.hashCode()
+            val playerId = session.playerId()
 
             // Action for COMMAND.SEEK_BACKWARD
             val seekBackwardIntent = Intent(this, VideoPlaybackService::class.java).apply {
@@ -209,6 +215,9 @@ class VideoPlaybackService : MediaSessionService() {
         }
     }
 
+    // Notification ids use the ExoPlayer's hash, see registerPlayer
+    private fun MediaSession.playerId(): Int = PlayerMediaSession.unwrap(player).hashCode()
+
     private fun hidePlayerNotification(player: ExoPlayer) {
         val notificationManager: NotificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(player.hashCode())
@@ -265,7 +274,7 @@ class VideoPlaybackService : MediaSessionService() {
                 return super.onStartCommand(intent, flags, startId)
             }
 
-            val session = mediaSessionsList.values.find { s -> s.player.hashCode() == playerId } ?: return super.onStartCommand(intent, flags, startId)
+            val session = mediaSessionsList.values.find { s -> s.playerId() == playerId } ?: return super.onStartCommand(intent, flags, startId)
 
             handleCommand(commandFromString(actionCommand), session)
         }
