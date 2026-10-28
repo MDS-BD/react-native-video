@@ -102,6 +102,7 @@ import androidx.media3.exoplayer.util.EventLogger;
 import androidx.media3.extractor.metadata.emsg.EventMessage;
 import androidx.media3.extractor.metadata.id3.Id3Frame;
 import androidx.media3.extractor.metadata.id3.TextInformationFrame;
+import androidx.media3.session.MediaSession;
 import androidx.media3.session.MediaSessionService;
 
 import com.brentvatne.common.api.AdsProps;
@@ -195,6 +196,8 @@ public class ReactExoplayerView extends FrameLayout implements
     private boolean playerNeedsSource;
     private ServiceConnection playbackServiceConnection;
     private PlaybackServiceBinder playbackServiceBinder;
+    // In-player session for voice control on Fire OS, see setupVoiceControlSession()
+    private MediaSession voiceControlSession;
 
     // logger to be enable by props
     private EventLogger debugEventLogger = null;
@@ -376,6 +379,7 @@ public class ReactExoplayerView extends FrameLayout implements
             setPlayWhenReady(!isPaused);
         }
         isInBackground = false;
+        setupVoiceControlSession();
     }
 
     @Override
@@ -388,6 +392,9 @@ public class ReactExoplayerView extends FrameLayout implements
             return;
         }
         setPlayWhenReady(false);
+        // Fire OS keeps sending voice commands to a session in the background, so "Alexa, play"
+        // would resume playback behind the launcher. The session is recreated in onHostResume.
+        releaseVoiceControlSession();
     }
 
     @Override
@@ -767,6 +774,8 @@ public class ReactExoplayerView extends FrameLayout implements
 
         if(showNotificationControls) {
             setupPlaybackService();
+        } else {
+            setupVoiceControlSession();
         }
     }
 
@@ -972,6 +981,32 @@ public class ReactExoplayerView extends FrameLayout implements
         }
 
         themedReactContext.bindService(intent, playbackServiceConnection, flags);
+    }
+
+    /**
+     * Fire OS routes Alexa transport commands ("pause", "rewind 30 seconds", ...) to the active
+     * MediaSession. No service or notification is needed for that. When notification controls are
+     * enabled, the VideoPlaybackService session takes over, so the player never has two sessions.
+     * The session only exists while the app is in the foreground (see onHostPause / onHostResume).
+     */
+    private void setupVoiceControlSession() {
+        if (player == null || voiceControlSession != null || showNotificationControls
+                || (isInBackground && !playInBackground)
+                || !PlayerMediaSession.INSTANCE.isFireTv(themedReactContext)) {
+            return;
+        }
+        try {
+            voiceControlSession = PlayerMediaSession.INSTANCE.builder(themedReactContext, player).build();
+        } catch (Exception e) {
+            DebugLog.e(TAG, "Could not create voice control MediaSession: " + e.getMessage());
+        }
+    }
+
+    private void releaseVoiceControlSession() {
+        if (voiceControlSession != null) {
+            voiceControlSession.release();
+            voiceControlSession = null;
+        }
     }
 
     private void cleanupPlaybackService() {
@@ -1213,6 +1248,7 @@ public class ReactExoplayerView extends FrameLayout implements
                 playbackServiceBinder.getService().unregisterPlayer(player);
                 themedReactContext.unbindService(playbackServiceConnection);
             }
+            releaseVoiceControlSession();
 
             updateResumePosition();
             player.release();
@@ -2631,9 +2667,11 @@ public class ReactExoplayerView extends FrameLayout implements
         this.showNotificationControls = showNotificationControls;
 
         if (playbackServiceConnection == null && showNotificationControls) {
+            releaseVoiceControlSession();
             setupPlaybackService();
         } else if(!showNotificationControls && playbackServiceConnection != null) {
             cleanupPlaybackService();
+            setupVoiceControlSession();
         }
     }
 

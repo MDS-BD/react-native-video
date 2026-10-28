@@ -1,3 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="com.brentvatne.react">
+    <!-- Alexa voice transport controls via MediaSession on Fire OS 13 and older, ignored elsewhere -->
+    <uses-permission android:name="com.amazon.permission.media.session.voicecommandcontrol" />
 </manifest>
