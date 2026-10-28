@@ -1,4 +1,72 @@
+## [6.16.2-mds.0](https://github.com/TheWidlarzGroup/react-native-video/compare/v6.16.1-ima.7...v6.16.2-mds.0) (2026-10-28)
 
+
+### Features
+
+* **alexa:** Implement PlayerMediaSession for Alexa Voice Controls for FireOS [VELA-6547] ([cd7ed7c](https://github.com/TheWidlarzGroup/react-native-video/commit/cd7ed7c0f37e484aeb34f4d3e12d9594123a07a6))
+
+## [6.16.1-ima.7](https://github.com/TheWidlarzGroup/react-native-video/compare/v6.16.1-ima.6...v6.16.1-ima.7) (2026-10-27)
+
+
+### Bug Fixes
+
+* reset ima when source change ([#18](https://github.com/TheWidlarzGroup/react-native-video/issues/18)) ([ceaf465](https://github.com/TheWidlarzGroup/react-native-video/commit/ceaf465d06757d3f64283697f7dbdd055f9c1cbd))
+
+## [6.16.1-ima.6](https://github.com/TheWidlarzGroup/react-native-video/compare/v6.16.1-ima.5...v6.16.1-ima.6) (2026-09-16)
+
+
+### Bug Fixes
+
+* Enhance live badge and controller focus behavior ([574ed57](https://github.com/TheWidlarzGroup/react-native-video/commit/574ed577be4454e6356b95025a3cc7e97118e5be))
+* Enhance live badge and controller focus behavior ([1a82451](https://github.com/TheWidlarzGroup/react-native-video/commit/1a824515c314fcc7a5dd142dac5e3f37283e9d30))
+
+## [6.16.1-ima.5](https://github.com/TheWidlarzGroup/react-native-video/compare/v6.16.1-ima.4...v6.16.1-ima.5) (2026-09-14)
+
+
+### Bug Fixes
+
+* android crash on stop player ([0d1f18e](https://github.com/TheWidlarzGroup/react-native-video/commit/0d1f18e2e6065605507377904d729ca34ae78812))
+
+## [6.16.1-ima.4](https://github.com/TheWidlarzGroup/react-native-video/compare/v6.16.1-ima.3...v6.16.1-ima.4) (2026-06-17)
+
+
+### Bug Fixes
+
+* retry ad request if video view not in hierarchy ([d872746](https://github.com/TheWidlarzGroup/react-native-video/commit/d872746c648565e2234922cafb81db5fb0d4ec16))
+
+## [6.16.1-ima.3](https://github.com/TheWidlarzGroup/react-native-video/compare/v6.16.1-ima.2...v6.16.1-ima.3) (2026-02-05)
+
+
+### Bug Fixes
+
+* init RCTPlayerContentPlayhead ([4ccec6f](https://github.com/TheWidlarzGroup/react-native-video/commit/4ccec6fa725d32eaa18e017b9d7c629c717592fe))
+* logs ([8e61625](https://github.com/TheWidlarzGroup/react-native-video/commit/8e61625aca4a1b6687b95ab9e095fb5e8040c439))
+
+## [6.16.1-ima.2](https://github.com/TheWidlarzGroup/react-native-video/compare/v6.16.1-ima.1...v6.16.1-ima.2) (2026-01-23)
+
+## [6.16.1-ima.1](https://github.com/TheWidlarzGroup/react-native-video/compare/v6.16.1-ima.0...v6.16.1-ima.1) (2025-10-02)
+
+
+### Bug Fixes
+
+* deinit ([e0b7bee](https://github.com/TheWidlarzGroup/react-native-video/commit/e0b7bee357617a7f8093a3f2ed0e881b7b43ea79))
+* format ([6eaccd1](https://github.com/TheWidlarzGroup/react-native-video/commit/6eaccd186db8d4b14d03968477412993651a8bbf))
+* normalize language to select correct media option ([9c0700c](https://github.com/TheWidlarzGroup/react-native-video/commit/9c0700ca77971b9c807bc8d85d6091a94166d4f2))
+* video player deinit on unmount ([d89ecfc](https://github.com/TheWidlarzGroup/react-native-video/commit/d89ecfcf16dc260ed9d4696974b92362fa638ff3))
+
+## [6.16.1-ima.0](https://github.com/TheWidlarzGroup/react-native-video/compare/v6.16.1...v6.16.1-ima.0) (2025-08-26)
+
+
+### Bug Fixes
+
+* **ios:** add audiovisualBackgroundPlaybackPolicy ([#4570](https://github.com/TheWidlarzGroup/react-native-video/issues/4570)) ([bf81038](https://github.com/TheWidlarzGroup/react-native-video/commit/bf810386b9ee1aed579b24adffb02f4acfa413db))
+
+
+### Features
+
+* Enhance IMA SDK tvOS support with additional events and config parameters ([2e3b0ea](https://github.com/TheWidlarzGroup/react-native-video/commit/2e3b0ea7de33124770358b37582b7444eb9f1658))
+* Extend availability check to tvOS 15.0 for audiovisualBackgroundPlaybackPolicy support ([d996d4a](https://github.com/TheWidlarzGroup/react-native-video/commit/d996d4a0388b20baed4bb2fbea8b8d088f337390))
+* Update GoogleAds-IMA-tvOS-SDK to version 4.15.1 ([78c244a](https://github.com/TheWidlarzGroup/react-native-video/commit/78c244a961c57337ef0359dd536f3a067499b10b))
 
 ## [6.16.1](https://github.com/TheWidlarzGroup/react-native-video/compare/v6.16.0...v6.16.1) (2025-07-08)
 
