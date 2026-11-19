@@ -196,7 +196,7 @@ public class ReactExoplayerView extends FrameLayout implements
     private boolean playerNeedsSource;
     private ServiceConnection playbackServiceConnection;
     private PlaybackServiceBinder playbackServiceBinder;
-    // In-player session for voice control on Fire OS, see setupVoiceControlSession()
+    // In-player session for voice control on Fire OS and Android TV, see setupVoiceControlSession()
     private MediaSession voiceControlSession;
 
     // logger to be enable by props
@@ -984,7 +984,7 @@ public class ReactExoplayerView extends FrameLayout implements
     }
 
     /**
-     * Fire OS routes Alexa transport commands ("pause", "rewind 30 seconds", ...) to the active
+     * Fire OS and Android TV route Assistant transport commands ("pause", "rewind 30 seconds", ...) to the active
      * MediaSession. No service or notification is needed for that. When notification controls are
      * enabled, the VideoPlaybackService session takes over, so the player never has two sessions.
      * The session only exists while the app is in the foreground (see onHostPause / onHostResume).
@@ -992,7 +992,7 @@ public class ReactExoplayerView extends FrameLayout implements
     private void setupVoiceControlSession() {
         if (player == null || voiceControlSession != null || showNotificationControls
                 || (isInBackground && !playInBackground)
-                || !PlayerMediaSession.INSTANCE.isFireTv(themedReactContext)) {
+                || !PlayerMediaSession.INSTANCE.supportsVoiceControls(themedReactContext)) {
             return;
         }
         try {
