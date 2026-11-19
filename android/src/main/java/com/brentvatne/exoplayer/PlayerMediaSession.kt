@@ -1,9 +1,11 @@
 package com.brentvatne.exoplayer
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.DeviceInfo
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
@@ -22,18 +24,27 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 
 /**
- * Shared MediaSession setup for the in-player session (Fire OS voice control)
+ * Shared MediaSession setup for the in-player session (Fire OS and Android TV voice control)
  * and the notification session of VideoPlaybackService, so both apply the same rules.
  */
 object PlayerMediaSession {
     private const val FIRE_TV_FEATURE = "amazon.hardware.fire_tv"
+    private const val ANDROID_TV_SEEK_INCREMENT_MS = 30_000L
 
     fun isFireTv(context: Context): Boolean =
         Build.MANUFACTURER.equals("Amazon", ignoreCase = true) &&
             context.packageManager.hasSystemFeature(FIRE_TV_FEATURE)
 
+    fun isAndroidTv(context: Context): Boolean =
+        !isFireTv(context) && context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
+
+    fun supportsVoiceControls(context: Context): Boolean = isFireTv(context) || isAndroidTv(context)
+
     fun builder(context: Context, player: Player): MediaSession.Builder =
-        MediaSession.Builder(context, SessionPlayer(player))
+        MediaSession.Builder(
+            context,
+            SessionPlayer(player, if (isAndroidTv(context)) ANDROID_TV_SEEK_INCREMENT_MS else null)
+        )
             // Session IDs must be unique per process, otherwise media3 throws on build()
             .setId("RNVideo_" + player.hashCode())
 
@@ -42,13 +53,16 @@ object PlayerMediaSession {
 }
 
 /**
- * Player handed to MediaSession controllers (Alexa, notification, headsets).
+ * Player handed to MediaSession controllers (Alexa, Google Assistant, notification, headsets).
  * Every controller command ends up in one of the overridden methods below, so this is the
  * single place to restrict what external controllers may do. ReactExoplayerView itself keeps
  * using the unwrapped ExoPlayer and is not affected.
  */
 @OptIn(UnstableApi::class)
-class SessionPlayer(player: Player) : ForwardingPlayer(player) {
+class SessionPlayer @JvmOverloads constructor(
+    player: Player,
+    private val seekIncrementMs: Long? = null
+) : ForwardingPlayer(player) {
 
     // Original session listener -> wrapper that reports our filtered commands, see addListener
     private val listeners = mutableMapOf<Player.Listener, Player.Listener>()
@@ -91,7 +105,7 @@ class SessionPlayer(player: Player) : ForwardingPlayer(player) {
      * would advertise ExoPlayer's commands instead of ours after every change (e.g. ad start).
      */
     override fun addListener(listener: Player.Listener) {
-        val filtering = CommandFilteringListener(listener) { availableCommands }
+        val filtering = CommandFilteringListener(listener, this)
         listeners[listener] = filtering
         super.addListener(filtering)
     }
@@ -133,18 +147,33 @@ class SessionPlayer(player: Player) : ForwardingPlayer(player) {
         if (!isTransportLocked) super.seekToDefaultPosition(mediaItemIndex)
     }
 
+    override fun getSeekBackIncrement(): Long = seekIncrementMs ?: super.getSeekBackIncrement()
+
+    override fun getSeekForwardIncrement(): Long = seekIncrementMs ?: super.getSeekForwardIncrement()
+
     override fun seekBack() {
-        if (!isTransportLocked) super.seekBack()
+        if (!isTransportLocked) {
+            if (seekIncrementMs == null) super.seekBack() else seekBy(-getSeekBackIncrement())
+        }
     }
 
     override fun seekForward() {
-        if (!isTransportLocked) super.seekForward()
+        if (!isTransportLocked) {
+            if (seekIncrementMs == null) super.seekForward() else seekBy(getSeekForwardIncrement())
+        }
+    }
+
+    private fun seekBy(offsetMs: Long) {
+        val positionMs = currentPosition + offsetMs
+        val durationMs = duration
+        val boundedPositionMs = if (durationMs == C.TIME_UNSET) positionMs else positionMs.coerceAtMost(durationMs)
+        seekTo(boundedPositionMs.coerceAtLeast(0L))
     }
 }
 
 /**
- * Forwards every [Player.Listener] callback unchanged, except that onAvailableCommandsChanged
- * reports the commands of [SessionPlayer] instead of the wrapped player's.
+ * Forwards every [Player.Listener] callback unchanged, except that command availability and
+ * seek increments use the values of [SessionPlayer] instead of the wrapped player's.
  *
  * All Player.Listener methods are Java default methods, which Kotlin's `by` delegation does not
  * forward, so each one is forwarded explicitly (media3 1.4.1). A callback missing here never
@@ -153,10 +182,10 @@ class SessionPlayer(player: Player) : ForwardingPlayer(player) {
 @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
 private class CommandFilteringListener(
     private val listener: Player.Listener,
-    private val filteredCommands: () -> Player.Commands
+    private val filteredPlayer: Player
 ) : Player.Listener {
     override fun onAvailableCommandsChanged(availableCommands: Player.Commands) =
-        listener.onAvailableCommandsChanged(filteredCommands())
+        listener.onAvailableCommandsChanged(filteredPlayer.availableCommands)
 
     override fun onEvents(player: Player, events: Player.Events) = listener.onEvents(player, events)
     override fun onTimelineChanged(timeline: Timeline, reason: Int) = listener.onTimelineChanged(timeline, reason)
@@ -184,9 +213,9 @@ private class CommandFilteringListener(
         listener.onPositionDiscontinuity(oldPosition, newPosition, reason)
     override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) =
         listener.onPlaybackParametersChanged(playbackParameters)
-    override fun onSeekBackIncrementChanged(seekBackIncrementMs: Long) = listener.onSeekBackIncrementChanged(seekBackIncrementMs)
+    override fun onSeekBackIncrementChanged(seekBackIncrementMs: Long) = listener.onSeekBackIncrementChanged(filteredPlayer.seekBackIncrement)
     override fun onSeekForwardIncrementChanged(seekForwardIncrementMs: Long) =
-        listener.onSeekForwardIncrementChanged(seekForwardIncrementMs)
+        listener.onSeekForwardIncrementChanged(filteredPlayer.seekForwardIncrement)
     override fun onMaxSeekToPreviousPositionChanged(maxSeekToPreviousPositionMs: Long) =
         listener.onMaxSeekToPreviousPositionChanged(maxSeekToPreviousPositionMs)
     override fun onAudioSessionIdChanged(audioSessionId: Int) = listener.onAudioSessionIdChanged(audioSessionId)

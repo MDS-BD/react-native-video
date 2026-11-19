@@ -56,8 +56,8 @@ class VideoPlaybackService : MediaSessionService() {
         }
         sourceActivity = from
 
-        // Fire OS gets the same command rules as the in-player voice control session, other devices stay unchanged
-        val sessionBuilder = if (PlayerMediaSession.isFireTv(this)) {
+        // TV sessions share the in-player voice command rules, including live/ad transport locks.
+        val sessionBuilder = if (PlayerMediaSession.supportsVoiceControls(this)) {
             PlayerMediaSession.builder(this, player)
         } else {
             MediaSession.Builder(this, player)
