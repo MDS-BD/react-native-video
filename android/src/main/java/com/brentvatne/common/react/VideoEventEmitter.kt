@@ -3,6 +3,7 @@ package com.brentvatne.common.react
 import com.brentvatne.common.api.TimedMetadata
 import com.brentvatne.common.api.Track
 import com.brentvatne.common.api.VideoTrack
+import androidx.media3.common.Player
 import com.brentvatne.exoplayer.ReactExoplayerView
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.WritableArray
@@ -31,6 +32,7 @@ enum class EventTypes(val eventName: String) {
     EVENT_READY("onReadyForDisplay"),
     EVENT_BUFFER("onVideoBuffer"),
     EVENT_PLAYBACK_STATE_CHANGED("onVideoPlaybackStateChanged"),
+    EVENT_PLAY_WHEN_READY_CHANGED("onVideoPlayWhenReadyChanged"),
     EVENT_IDLE("onVideoIdle"),
     EVENT_TIMED_METADATA("onTimedMetadata"),
     EVENT_AUDIO_BECOMING_NOISY("onVideoAudioBecomingNoisy"),
@@ -71,6 +73,7 @@ class VideoEventEmitter {
     lateinit var onVideoProgress: (currentPosition: Long, bufferedDuration: Long, seekableDuration: Long, currentPlaybackTime: Double) -> Unit
     lateinit var onVideoBandwidthUpdate: (bitRateEstimate: Long, height: Int, width: Int, trackId: String?) -> Unit
     lateinit var onVideoPlaybackStateChanged: (isPlaying: Boolean, isSeeking: Boolean) -> Unit
+    lateinit var onVideoPlayWhenReadyChanged: (playWhenReady: Boolean, reason: Int) -> Unit
     lateinit var onVideoSeek: (currentPosition: Long, seekTime: Long) -> Unit
     lateinit var onVideoEnd: () -> Unit
     lateinit var onVideoFullscreenPlayerWillPresent: () -> Unit
@@ -168,6 +171,12 @@ class VideoEventEmitter {
                 event.dispatch(EventTypes.EVENT_PLAYBACK_STATE_CHANGED) {
                     putBoolean("isPlaying", isPlaying)
                     putBoolean("isSeeking", isSeeking)
+                }
+            }
+            onVideoPlayWhenReadyChanged = { playWhenReady, reason ->
+                event.dispatch(EventTypes.EVENT_PLAY_WHEN_READY_CHANGED) {
+                    putBoolean("playWhenReady", playWhenReady)
+                    putString("reason", playWhenReadyChangeReasonToString(reason))
                 }
             }
             onVideoSeek = { currentPosition, seekTime ->
@@ -290,6 +299,17 @@ class VideoEventEmitter {
         // ALL_ADS_COMPLETED): coalescing would deliver only the last one to JS
         override fun canCoalesce(): Boolean = event != EventTypes.EVENT_ON_RECEIVE_AD_EVENT
     }
+
+    private fun playWhenReadyChangeReasonToString(reason: Int): String =
+        when (reason) {
+            Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST -> "USER_REQUEST"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS -> "AUDIO_FOCUS_LOSS"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY -> "AUDIO_BECOMING_NOISY"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE -> "REMOTE"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM -> "END_OF_MEDIA_ITEM"
+            Player.PLAY_WHEN_READY_CHANGE_REASON_SUPPRESSED_TOO_LONG -> "SUPPRESSED_TOO_LONG"
+            else -> "UNKNOWN"
+        }
 
     private class EventBuilder(private val surfaceId: Int, private val viewId: Int, private val dispatcher: EventDispatcher) {
         fun dispatch(event: EventTypes, paramsSetter: (WritableMap.() -> Unit)? = null) =
