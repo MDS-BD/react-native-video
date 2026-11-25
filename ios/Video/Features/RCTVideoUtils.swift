@@ -174,12 +174,15 @@ enum RCTVideoUtils {
             // Compare the options themselves: displayName is the localized language name,
             // so different tracks with the same language (e.g. main / audio description /
             // clear speech) would all be reported as selected.
-            let audioTrack = [
+            var audioTrack = [
                 "index": NSNumber(value: i),
                 "title": title,
                 "language": language,
                 "selected": selectedOption != nil && currentOption == selectedOption,
             ] as [String: Any]
+            if let currentOption, let group {
+                audioTrack.merge(getTrackRoleInfo(option: currentOption, group: group)) { _, new in new }
+            }
             audioTracks.add(audioTrack)
         }
 
@@ -204,16 +207,65 @@ enum RCTVideoUtils {
                 title = value as! String
             }
             let language: String = currentOption?.extendedLanguageTag ?? ""
-            let textTrack = TextTrack([
+            var textTrackJson = [
                 "index": NSNumber(value: i),
                 "title": title,
                 "language": language as Any,
                 "selected": selectedOption != nil && currentOption == selectedOption,
-            ])
-            textTracks.append(textTrack)
+            ] as [String: Any]
+            if let currentOption, let group {
+                textTrackJson.merge(getTrackRoleInfo(option: currentOption, group: group)) { _, new in new }
+            }
+            textTracks.append(TextTrack(textTrackJson as NSDictionary))
         }
 
         return textTracks
+    }
+
+    /// AVFoundation media characteristics mapped to DASH role values (urn:mpeg:dash:role:2011),
+    /// so that iOS and Android expose the same `roles` vocabulary (the one Shaka reports for DASH).
+    /// `public.main-program-content` is intentionally not mapped: AVFoundation infers it for every
+    /// option that is not auxiliary content, so it carries no information (use `primary` instead).
+    /// Raw values are used because some constants are not available on older OS versions
+    /// (e.g. AVMediaCharacteristic.enhancesSpeechIntelligibility is tvOS/iOS 17+).
+    private static let characteristicToRole: [(characteristic: String, role: String)] = [
+        ("public.accessibility.describes-video", "description"),
+        ("public.accessibility.enhances-speech-intelligibility", "enhanced-audio-intelligibility"),
+        ("public.accessibility.transcribes-spoken-dialog", "transcribes-dialog"),
+        ("public.accessibility.describes-music-and-sound", "describes-music-and-sound"),
+        ("public.easy-to-read", "easyreader"),
+        ("public.translation.dubbed", "dub"),
+        ("public.subtitles.forced-only", "forced-subtitle"),
+    ]
+
+    /// `primary`, `roles` and `accessibilityPurpose` of a media selection option,
+    /// aligned with the fields of Shaka's AudioTrack / TextTrack.
+    /// - primary: the option is the group's default one (HLS `DEFAULT=YES`)
+    /// - roles: from the option's media characteristics (HLS `CHARACTERISTICS`)
+    static func getTrackRoleInfo(option: AVMediaSelectionOption, group: AVMediaSelectionGroup) -> [String: Any] {
+        let roles = characteristicToRole.compactMap {
+            option.hasMediaCharacteristic(AVMediaCharacteristic(rawValue: $0.characteristic)) ? $0.role : nil
+        }
+
+        var info: [String: Any] = [
+            "primary": group.defaultOption == option,
+            "roles": roles,
+        ]
+        if let accessibilityPurpose = getAccessibilityPurpose(roles: roles) {
+            info["accessibilityPurpose"] = accessibilityPurpose
+        }
+        return info
+    }
+
+    /// Same values as Shaka's `shaka.media.ManifestParser.AccessibilityPurpose`.
+    static func getAccessibilityPurpose(roles: [String]) -> String? {
+        if roles.contains("description") {
+            return "visually impaired"
+        }
+        if roles.contains("enhanced-audio-intelligibility") {
+            return "hard of hearing"
+        }
+        return nil
     }
 
     // UNUSED

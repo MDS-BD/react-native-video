@@ -163,6 +163,19 @@ type OnLoadData = Readonly<{
     bitrate?: Float;
     type?: string;
     selected?: boolean;
+    /**
+     * HLS `DEFAULT=YES` / DASH `Role main` (same as Shaka `primary`)
+     */
+    primary?: boolean;
+    /**
+     * DASH role values (urn:mpeg:dash:role:2011), e.g. `main`, `alternate`, `description`,
+     * `enhanced-audio-intelligibility`, `dub`, `commentary`, `caption`, `subtitle`, `forced-subtitle`
+     */
+    roles?: string[];
+    /**
+     * `visually impaired` | `hard of hearing` (same values as Shaka `accessibilityPurpose`)
+     */
+    accessibilityPurpose?: string;
   }[];
   textTracks: {
     index: Int32;
@@ -173,6 +186,19 @@ type OnLoadData = Readonly<{
      */
     type?: WithDefault<string, 'srt'>;
     selected?: boolean;
+    /**
+     * HLS `DEFAULT=YES` / DASH `Role main` (same as Shaka `primary`)
+     */
+    primary?: boolean;
+    /**
+     * DASH role values (urn:mpeg:dash:role:2011), e.g. `main`, `alternate`, `description`,
+     * `enhanced-audio-intelligibility`, `dub`, `commentary`, `caption`, `subtitle`, `forced-subtitle`
+     */
+    roles?: string[];
+    /**
+     * `visually impaired` | `hard of hearing` (same values as Shaka `accessibilityPurpose`)
+     */
+    accessibilityPurpose?: string;
   }[];
 }>;
 
@@ -227,6 +253,19 @@ export type OnAudioTracksData = Readonly<{
     bitrate?: Float;
     type?: string;
     selected?: boolean;
+    /**
+     * HLS `DEFAULT=YES` / DASH `Role main` (same as Shaka `primary`)
+     */
+    primary?: boolean;
+    /**
+     * DASH role values (urn:mpeg:dash:role:2011), e.g. `main`, `alternate`, `description`,
+     * `enhanced-audio-intelligibility`, `dub`, `commentary`, `caption`, `subtitle`, `forced-subtitle`
+     */
+    roles?: string[];
+    /**
+     * `visually impaired` | `hard of hearing` (same values as Shaka `accessibilityPurpose`)
+     */
+    accessibilityPurpose?: string;
   }[];
 }>;
 
@@ -240,6 +279,19 @@ type OnTextTracksData = Readonly<{
      */
     type?: WithDefault<string, 'srt'>;
     selected?: boolean;
+    /**
+     * HLS `DEFAULT=YES` / DASH `Role main` (same as Shaka `primary`)
+     */
+    primary?: boolean;
+    /**
+     * DASH role values (urn:mpeg:dash:role:2011), e.g. `main`, `alternate`, `description`,
+     * `enhanced-audio-intelligibility`, `dub`, `commentary`, `caption`, `subtitle`, `forced-subtitle`
+     */
+    roles?: string[];
+    /**
+     * `visually impaired` | `hard of hearing` (same values as Shaka `accessibilityPurpose`)
+     */
+    accessibilityPurpose?: string;
   }[];
 }>;
 
