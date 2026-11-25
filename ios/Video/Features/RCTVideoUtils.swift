@@ -160,6 +160,7 @@ enum RCTVideoUtils {
         let audioTracks = NSMutableArray()
 
         let group = await RCTVideoAssetsUtils.getMediaSelectionGroup(asset: asset, for: .audible)
+        let selectedOption: AVMediaSelectionOption? = group.flatMap { player.currentItem?.currentMediaSelection.selectedMediaOption(in: $0) }
 
         for i in 0 ..< (group?.options.count ?? 0) {
             let currentOption = group?.options[i]
@@ -170,13 +171,14 @@ enum RCTVideoUtils {
             }
             let language: String = currentOption?.extendedLanguageTag ?? ""
 
-            let selectedOption: AVMediaSelectionOption? = player.currentItem?.currentMediaSelection.selectedMediaOption(in: group!)
-
+            // Compare the options themselves: displayName is the localized language name,
+            // so different tracks with the same language (e.g. main / audio description /
+            // clear speech) would all be reported as selected.
             let audioTrack = [
                 "index": NSNumber(value: i),
                 "title": title,
                 "language": language,
-                "selected": currentOption?.displayName == selectedOption?.displayName,
+                "selected": selectedOption != nil && currentOption == selectedOption,
             ] as [String: Any]
             audioTracks.add(audioTrack)
         }
@@ -192,6 +194,7 @@ enum RCTVideoUtils {
         // if streaming video, we extract the text tracks
         var textTracks: [TextTrack] = []
         let group = await RCTVideoAssetsUtils.getMediaSelectionGroup(asset: asset, for: .legible)
+        let selectedOption: AVMediaSelectionOption? = group.flatMap { player.currentItem?.currentMediaSelection.selectedMediaOption(in: $0) }
 
         for i in 0 ..< (group?.options.count ?? 0) {
             let currentOption = group?.options[i]
@@ -201,12 +204,11 @@ enum RCTVideoUtils {
                 title = value as! String
             }
             let language: String = currentOption?.extendedLanguageTag ?? ""
-            let selectedOption: AVMediaSelectionOption? = player.currentItem?.currentMediaSelection.selectedMediaOption(in: group!)
             let textTrack = TextTrack([
                 "index": NSNumber(value: i),
                 "title": title,
                 "language": language as Any,
-                "selected": currentOption?.displayName == selectedOption?.displayName,
+                "selected": selectedOption != nil && currentOption == selectedOption,
             ])
             textTracks.append(textTrack)
         }
