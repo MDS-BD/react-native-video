@@ -52,6 +52,9 @@ Triggered when available audio tracks change.
 | bitrate  | number  | Track bitrate                                                              |
 | type     | string  | Track MIME type                                                            |
 | selected | boolean | `true` if track is currently playing                                       |
+| primary  | boolean | `true` for the default track: HLS `DEFAULT=YES` (iOS/Android), DASH `Role main` (Android). Same as Shaka `primary` |
+| roles    | string[] | DASH role values (`urn:mpeg:dash:role:2011`), same vocabulary on iOS and Android: `main`, `alternate`, `supplementary`, `commentary`, `dub`, `emergency`, `caption`, `subtitle`, `sign`, `description`, `enhanced-audio-intelligibility`, `describes-music-and-sound`, `transcribes-dialog`, `easyreader`, `forced-subtitle`. On iOS they come from the HLS `CHARACTERISTICS` (`main` is never reported, use `primary`) |
+| accessibilityPurpose | string | Optional. `visually impaired` (`description` role) or `hard of hearing` (`enhanced-audio-intelligibility` role). Same values as Shaka |
 
 **Example:**
 ```javascript
@@ -571,6 +574,9 @@ Triggered when available text (subtitle) tracks change.
 | language | string  | 2 letter [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes) language code                           |
 | type     | string  | Track MIME type (_VTT_, _SRT_, _TTML_)                                                                      |
 | selected | boolean | `true` if the track is currently playing                                                                   |
+| primary  | boolean | `true` for the default track: HLS `DEFAULT=YES` (iOS/Android), DASH `Role main` (Android). Same as Shaka `primary` |
+| roles    | string[] | DASH role values (`urn:mpeg:dash:role:2011`), same vocabulary on iOS and Android: `main`, `alternate`, `supplementary`, `commentary`, `dub`, `emergency`, `caption`, `subtitle`, `sign`, `description`, `enhanced-audio-intelligibility`, `describes-music-and-sound`, `transcribes-dialog`, `easyreader`, `forced-subtitle`. On iOS they come from the HLS `CHARACTERISTICS` (`main` is never reported, use `primary`) |
+| accessibilityPurpose | string | Optional. `visually impaired` (`description` role) or `hard of hearing` (`enhanced-audio-intelligibility` role). Same values as Shaka |
 
 **Example:**
 ```javascript

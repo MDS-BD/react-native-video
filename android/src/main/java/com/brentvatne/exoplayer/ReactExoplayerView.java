@@ -1702,6 +1702,7 @@ public class ReactExoplayerView extends FrameLayout implements
         if (format.language != null) track.setLanguage(format.language);
         if (format.label != null) track.setTitle(format.label);
         track.setSelected(isTrackSelected(selection, group, trackIndex));
+        track.setRoleInfo(format);
         return track;
     }
 
@@ -1772,6 +1773,7 @@ public class ReactExoplayerView extends FrameLayout implements
             track.setSelected(false); // Don't report selection status - let PlayerView handle it
             if (format.sampleMimeType != null) track.setMimeType(format.sampleMimeType);
             track.setBitrate(format.bitrate == Format.NO_VALUE ? 0 : format.bitrate);
+            track.setRoleInfo(format);
             
             tracks.add(track);
         }
@@ -1815,6 +1817,7 @@ public class ReactExoplayerView extends FrameLayout implements
                 }
                 
                 textTrack.setSelected(false); // Don't report selection status - let PlayerView handle it
+                textTrack.setRoleInfo(format);
                 textTracks.add(textTrack);
             }
         }

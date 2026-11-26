@@ -41,6 +41,19 @@ export type OnLoadData = Readonly<{
     bitrate?: number;
     type?: string;
     selected?: boolean;
+    /**
+     * HLS `DEFAULT=YES` / DASH `Role main` (same as Shaka `primary`)
+     */
+    primary?: boolean;
+    /**
+     * DASH role values (urn:mpeg:dash:role:2011), e.g. `main`, `alternate`, `description`,
+     * `enhanced-audio-intelligibility`, `dub`, `commentary`, `caption`, `subtitle`, `forced-subtitle`
+     */
+    roles?: string[];
+    /**
+     * `visually impaired` | `hard of hearing` (same values as Shaka `accessibilityPurpose`)
+     */
+    accessibilityPurpose?: string;
   }[];
   textTracks: {
     index: number;
@@ -51,6 +64,19 @@ export type OnLoadData = Readonly<{
      */
     type?: WithDefault<'srt' | 'ttml' | 'vtt', 'srt'>;
     selected?: boolean;
+    /**
+     * HLS `DEFAULT=YES` / DASH `Role main` (same as Shaka `primary`)
+     */
+    primary?: boolean;
+    /**
+     * DASH role values (urn:mpeg:dash:role:2011), e.g. `main`, `alternate`, `description`,
+     * `enhanced-audio-intelligibility`, `dub`, `commentary`, `caption`, `subtitle`, `forced-subtitle`
+     */
+    roles?: string[];
+    /**
+     * `visually impaired` | `hard of hearing` (same values as Shaka `accessibilityPurpose`)
+     */
+    accessibilityPurpose?: string;
   }[];
   videoTracks: {
     index: number;
@@ -73,6 +99,19 @@ export type OnTextTracksData = Readonly<{
      */
     type?: WithDefault<string, 'srt'>;
     selected?: boolean;
+    /**
+     * HLS `DEFAULT=YES` / DASH `Role main` (same as Shaka `primary`)
+     */
+    primary?: boolean;
+    /**
+     * DASH role values (urn:mpeg:dash:role:2011), e.g. `main`, `alternate`, `description`,
+     * `enhanced-audio-intelligibility`, `dub`, `commentary`, `caption`, `subtitle`, `forced-subtitle`
+     */
+    roles?: string[];
+    /**
+     * `visually impaired` | `hard of hearing` (same values as Shaka `accessibilityPurpose`)
+     */
+    accessibilityPurpose?: string;
   }[];
 }>;
 

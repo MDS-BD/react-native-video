@@ -350,6 +350,7 @@ class VideoEventEmitter {
                         format.language?.let { putString("language", it) }
                         if (format.bitrate > 0) putInt("bitrate", format.bitrate)
                         putBoolean("selected", format.isSelected)
+                        putTrackRoleInfo(format)
                     }
                 )
             }
@@ -383,10 +384,17 @@ class VideoEventEmitter {
                         putString("type", format.mimeType)
                         putString("language", format.language)
                         putBoolean("selected", format.isSelected)
+                        putTrackRoleInfo(format)
                     }
                 )
             }
         }
+
+    private fun WritableMap.putTrackRoleInfo(track: Track) {
+        putBoolean("primary", track.isPrimary)
+        putArray("roles", Arguments.createArray().apply { track.roles.forEach { pushString(it) } })
+        track.accessibilityPurpose?.let { putString("accessibilityPurpose", it) }
+    }
 
     private fun aspectRatioToNaturalSize(videoWidth: Int, videoHeight: Int): WritableMap =
         Arguments.createMap().apply {
