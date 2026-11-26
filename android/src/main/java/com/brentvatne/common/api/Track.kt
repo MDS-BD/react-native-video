@@ -23,12 +23,14 @@ class Track {
 
     /**
      * Fills [isPrimary], [roles] and [accessibilityPurpose] from the ExoPlayer format.
-     * - primary: SELECTION_FLAG_DEFAULT, set by ExoPlayer from HLS `DEFAULT=YES` and DASH `Role main`
+     * - primary: HLS `DEFAULT=YES` (SELECTION_FLAG_DEFAULT) or DASH `Role main` (ROLE_FLAG_MAIN:
+     *   ExoPlayer does not set the default flag from it)
      * - roles: ExoPlayer role flags mapped to DASH role values (urn:mpeg:dash:role:2011),
      *   same vocabulary exposed on iOS
      */
     fun setRoleInfo(format: Format) {
-        isPrimary = (format.selectionFlags and C.SELECTION_FLAG_DEFAULT) != 0
+        isPrimary = (format.selectionFlags and C.SELECTION_FLAG_DEFAULT) != 0 ||
+            (format.roleFlags and C.ROLE_FLAG_MAIN) != 0
 
         val trackRoles = ROLE_FLAGS.filter { (flag, _) -> (format.roleFlags and flag) != 0 }.map { it.second }.toMutableList()
         if ((format.selectionFlags and C.SELECTION_FLAG_FORCED) != 0) {
