@@ -29,6 +29,7 @@ import type {
   OnLoadStartData,
   OnPictureInPictureStatusChangedData,
   OnPlaybackStateChangedData,
+  OnPlayWhenReadyChangedData,
   OnProgressData,
   OnSeekData,
   OnTextTrackDataChangedData,
@@ -99,6 +100,7 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       onRestoreUserInterfaceForPictureInPictureStop,
       onReceiveAdEvent,
       onPlaybackStateChanged,
+      onPlayWhenReadyChanged,
       onAudioFocusChanged,
       onIdle,
       onTimedMetadata,
@@ -516,6 +518,13 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
       [onPlaybackStateChanged],
     );
 
+    const onVideoPlayWhenReadyChanged = useCallback(
+      (e: NativeSyntheticEvent<OnPlayWhenReadyChangedData>) => {
+        onPlayWhenReadyChanged?.(e.nativeEvent);
+      },
+      [onPlayWhenReadyChanged],
+    );
+
     const _shutterColor = useMemo(() => {
       const color = processColor(shutterColor);
       return typeof color === 'number' ? color : undefined;
@@ -872,6 +881,9 @@ const Video = forwardRef<VideoRef, ReactVideoProps>(
           onVideoBuffer={onBuffer ? onVideoBuffer : undefined}
           onVideoPlaybackStateChanged={
             onPlaybackStateChanged ? onVideoPlaybackStateChanged : undefined
+          }
+          onVideoPlayWhenReadyChanged={
+            onPlayWhenReadyChanged ? onVideoPlayWhenReadyChanged : undefined
           }
           onVideoBandwidthUpdate={
             onBandwidthUpdate ? _onBandwidthUpdate : undefined

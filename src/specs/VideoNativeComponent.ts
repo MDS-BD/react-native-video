@@ -238,6 +238,17 @@ export type OnPlaybackStateChangedData = Readonly<{
   isSeeking: boolean;
 }>;
 
+export type OnPlayWhenReadyChangedData = Readonly<{
+  playWhenReady: boolean;
+  /**
+   * USER_REQUEST | AUDIO_FOCUS_LOSS | AUDIO_BECOMING_NOISY | REMOTE | END_OF_MEDIA_ITEM |
+   * SUPPRESSED_TOO_LONG | UNKNOWN
+   * (ExoPlayer PLAY_WHEN_READY_CHANGE_REASON_*)
+   * https://developer.android.com/reference/androidx/media3/common/Player.PlayWhenReadyChangeReason
+   */
+  reason: string;
+}>;
+
 export type OnTimedMetadataData = Readonly<{
   metadata: {
     value?: string;
@@ -448,6 +459,7 @@ export interface VideoNativeProps extends ViewProps {
   onRestoreUserInterfaceForPictureInPictureStop?: DirectEventHandler<{}>;
   onReceiveAdEvent?: DirectEventHandler<OnReceiveAdEventData>;
   onVideoPlaybackStateChanged?: DirectEventHandler<OnPlaybackStateChangedData>; // android only
+  onVideoPlayWhenReadyChanged?: DirectEventHandler<OnPlayWhenReadyChangedData>; // android only
   onVideoIdle?: DirectEventHandler<{}>; // android only (nowhere in document, so do not use as props. just type declaration)
   onAudioFocusChanged?: DirectEventHandler<OnAudioFocusChangedData>; // android only (nowhere in document, so do not use as props. just type declaration)
   onTimedMetadata?: DirectEventHandler<OnTimedMetadataData>; // ios, android

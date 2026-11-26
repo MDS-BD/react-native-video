@@ -1993,6 +1993,18 @@ public class ReactExoplayerView extends FrameLayout implements
         }
     }
 
+    /**
+     * playWhenReady is the user intention to play, set with play/pause (here: JS, MediaSession
+     * controllers such as Google Assistant or Alexa, app background/foreground). It is separate
+     * from the playback state: buffering, seeking and playback completion change the state, not
+     * this flag.
+     * https://developer.android.com/media/media3/exoplayer/listening-to-player-events#playback-state
+     */
+    @Override
+    public void onPlayWhenReadyChanged(boolean playWhenReady, @Player.PlayWhenReadyChangeReason int reason) {
+        eventEmitter.onVideoPlayWhenReadyChanged.invoke(playWhenReady, reason);
+    }
+
     @Override
     public void onPlayerError(@NonNull PlaybackException e) {
         String errorString = "ExoPlaybackException: " + PlaybackException.getErrorCodeName(e.errorCode);

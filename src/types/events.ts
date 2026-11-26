@@ -10,6 +10,7 @@ import type {
   OnPictureInPictureStatusChangedData,
   OnPlaybackRateChangeData,
   OnPlaybackStateChangedData,
+  OnPlayWhenReadyChangedData,
   OnProgressData,
   OnSeekData,
   OnTextTrackDataChangedData,
@@ -300,6 +301,7 @@ export interface ReactVideoEvents {
   onRestoreUserInterfaceForPictureInPictureStop?: () => void; //iOS
   onSeek?: (e: OnSeekData) => void; //Android, iOS, Windows UWP
   onPlaybackStateChanged?: (e: OnPlaybackStateChangedData) => void; // Android, iOS
+  onPlayWhenReadyChanged?: (e: OnPlayWhenReadyChangedData) => void; // Android
   onTimedMetadata?: (e: OnTimedMetadataData) => void; //Android, iOS
   onAudioTracks?: (e: OnAudioTracksData) => void; // Android
   onTextTracks?: (e: OnTextTracksData) => void; //Android
